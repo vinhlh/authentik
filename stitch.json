@@ -1,0 +1,27 @@
+{
+  "projectId": "13720308334393630226",
+  "projectName": "Authentik - Da Nang Food Discovery",
+  "screens": [
+    {
+      "id": "05da3ffee8ac4b6ca561092969a8d09f",
+      "title": "TasteScout Da Nang Homepage",
+      "deviceType": "DESKTOP",
+      "htmlFile": "queue/index.html",
+      "screenshotFile": "queue/index.png"
+    },
+    {
+      "id": "bdf2452f2e9a450090c483d21515766b",
+      "title": "Authentik Da Nang Homepage",
+      "deviceType": "DESKTOP",
+      "htmlFile": "queue/home-authentik.html",
+      "screenshotFile": "queue/home-authentik.png"
+    },
+    {
+      "id": "fbfc613eddca42bb8061589992412d9f",
+      "title": "Best Bánh Mì Collection Detail",
+      "deviceType": "DESKTOP",
+      "htmlFile": "queue/collection-banh-mi.html",
+      "screenshotFile": "queue/collection-banh-mi.png"
+    }
+  ]
+}

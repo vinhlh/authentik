@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Authentik Da Nang Homepage</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#db7706",
+                        "background-light": "#fafaf9",
+                        "background-dark": "#1c1917",
+                        "charcoal": "#1c1917",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .masonry {
+            column-count: 3;
+            column-gap: 1.5rem;
+        }
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-charcoal dark:text-gray-100 min-h-screen">
+<div class="layout-container flex flex-col">
+<!-- Header -->
+<header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+<div class="max-w-[1200px] mx-auto px-6 py-4 flex items-center justify-between gap-8">
+<!-- Logo -->
+<div class="flex items-center gap-2 shrink-0">
+<span class="material-symbols-outlined text-primary text-3xl font-bold">restaurant_menu</span>
+<h1 class="text-primary text-2xl font-bold tracking-tight">Authentik</h1>
+</div>
+<!-- Search Bar -->
+<div class="flex-1 max-w-2xl">
+<label class="relative flex items-center w-full">
+<span class="material-symbols-outlined absolute left-4 text-gray-400">search</span>
+<input class="w-full h-12 pl-12 pr-4 bg-white dark:bg-gray-800 border-none rounded-xl shadow-sm focus:ring-2 focus:ring-primary/20 text-base placeholder:text-gray-400" placeholder="Find local favorites in Da Nang..." type="text"/>
+</label>
+</div>
+<!-- User Actions -->
+<div class="flex items-center gap-4 shrink-0">
+<button class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+<span class="material-symbols-outlined">favorite</span>
+</button>
+<button class="flex items-center gap-2 p-1.5 pl-3 border border-gray-200 dark:border-gray-700 rounded-full hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-gray-600">menu</span>
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-sm">person</span>
+</div>
+</button>
+</div>
+</div>
+</header>
+<main class="max-w-[1200px] mx-auto px-6 py-8 w-full">
+<!-- Hero / Collections Section -->
+<section class="mb-12">
+<div class="flex items-end justify-between mb-6">
+<div>
+<h2 class="text-3xl font-bold text-charcoal dark:text-white">Curated Collections</h2>
+<p class="text-gray-500 dark:text-gray-400 mt-1">Hand-picked experiences by local food experts</p>
+</div>
+<button class="text-primary font-semibold flex items-center gap-1 hover:underline">
+                        View all <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="flex overflow-x-auto pb-4 gap-6 scrollbar-hide -mx-2 px-2">
+<!-- Collection Card 1 -->
+<div class="flex-none w-[280px] group cursor-pointer">
+<div class="relative aspect-[4/5] rounded-xl overflow-hidden mb-3">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="Close up of a delicious Vietnamese banh mi sandwich" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQotmS0mJT-fuVKsZ-cSy0yA6kSSwiqrM9priikHd6m6CJbng8h6vV1QYJSkLKjodrD5n6vtpVRmOw696n4oTmGrIclHtQfcA23jk-rNXqfBtW3rzG99QZj2OazvRANGIk2ivD2gql0655Lb7rHwuEqSRKA097WYXRGHW72nDwlwsNC09rCVfu43cRKb3ufKafLoW4j5jceQg0A2EtMQADTbelvNsnEkFcW3JScWBNq7uIwKzjJJiA2EGhUu_Uhr2_VixheZRiZPQp"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-xs uppercase tracking-widest font-bold opacity-80">12 Spots</p>
+<h3 class="text-xl font-bold">Best Bánh Mì</h3>
+</div>
+</div>
+</div>
+<!-- Collection Card 2 -->
+<div class="flex-none w-[280px] group cursor-pointer">
+<div class="relative aspect-[4/5] rounded-xl overflow-hidden mb-3">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="Minimalist aesthetic cafe interior with warm lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB4tbpXtXMDvGCGgHwDzNzoo9T_zj8I_Y0Gl50ohiL35KWnMLJ3ELojHXHEJTkze6QJ-j8btpCRnu45rz-HGlxktJwXOosxvkHSFeNcLfYzD0MubgyqBa2h4TNl30niKFWTaLQ7UthK-t4YnC6MAiVrk5c-dT-3zdt5r8ju_Q12PBZ9XigN8_oeR-Dj6NaI_S1nBsMT9cU2_aNhu-vivZ1-vrV8-VCBAdK7LE83i65EIIphsoM7hzaiX-pQPe1Tefnn6bYHlrJmcbKc"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-xs uppercase tracking-widest font-bold opacity-80">8 Spots</p>
+<h3 class="text-xl font-bold">Hidden Gem Cafes</h3>
+</div>
+</div>
+</div>
+<!-- Collection Card 3 -->
+<div class="flex-none w-[280px] group cursor-pointer">
+<div class="relative aspect-[4/5] rounded-xl overflow-hidden mb-3">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="Fresh seafood display at a Vietnamese market" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRUORrAdr0SwVUCy2lB927UBnOjTUx5LfUyjeMk9725g29hTekm-rFyNm6Sti7gvwTvEn8GL4BWhMEvAX0tzmS_hHXhXeFHxE1yPYs-6xUxWfMUMl1EpGxbLWw2cB5C6GWA9eX3N3GCLZX8Iks4RgHDVVHCigy5JPtwUCgY3dxS4YexTEDvn8pgPNbMi1wWRevYod8gFEcx3GOejM4NRI1NmU7WAEXqvOE_rSnpbOLOz7Cc9OvDM48qm3cxizGZqcNGnEA0h-9lFEl"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-xs uppercase tracking-widest font-bold opacity-80">15 Spots</p>
+<h3 class="text-xl font-bold">Late Night Seafood</h3>
+</div>
+</div>
+</div>
+<!-- Collection Card 4 -->
+<div class="flex-none w-[280px] group cursor-pointer">
+<div class="relative aspect-[4/5] rounded-xl overflow-hidden mb-3">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A bowl of traditional My Quang noodles" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEqMxRMvGL_ym0jaO2iZFAT7cI4u9pgzWLc6bwaSzqTB82kF8tMI54dIgoTrqXEis4uBNJP_LrqBJ__THnKVyi_Rz13LAjOlZxOGcR1TOBMz9EDFpKr4vuOrFOoZmdbbtnQ73ptoZtlVrCG6E30w53YW9El991McCfp0cCc6tJ0Cp4XcM2AO4_DyGZEkTNSBLvRcr7MufvJHN0NXTA32Jap9ydsCGuXl1LG22mB5WuRodKmvL82y3_tbK7v3x38YWs7TjWZ7A8xIsi"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-xs uppercase tracking-widest font-bold opacity-80">10 Spots</p>
+<h3 class="text-xl font-bold">Traditional Mỳ Quảng</h3>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Filter Bar -->
+<div class="sticky top-[80px] z-40 bg-background-light dark:bg-background-dark py-4 mb-8">
+<div class="flex gap-3 overflow-x-auto scrollbar-hide">
+<button class="px-6 py-2 rounded-full bg-primary text-white font-medium text-sm transition-colors">All</button>
+<button class="px-6 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-charcoal dark:text-gray-200 font-medium text-sm hover:border-primary transition-colors">Breakfast</button>
+<button class="px-6 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-charcoal dark:text-gray-200 font-medium text-sm hover:border-primary transition-colors">Coffee</button>
+<button class="px-6 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-charcoal dark:text-gray-200 font-medium text-sm hover:border-primary transition-colors">Seafood</button>
+<button class="px-6 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-charcoal dark:text-gray-200 font-medium text-sm hover:border-primary transition-colors">Cheap Eats</button>
+<button class="px-6 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-charcoal dark:text-gray-200 font-medium text-sm hover:border-primary transition-colors">Dinner</button>
+<button class="px-6 py-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-charcoal dark:text-gray-200 font-medium text-sm hover:border-primary transition-colors">Street Food</button>
+</div>
+</div>
+<!-- Discovery Grid -->
+<div class="masonry">
+<!-- Grid Item 1 -->
+<div class="masonry-item">
+<div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
+<div class="relative">
+<img class="w-full h-auto object-cover" data-alt="Traditional Vietnamese noodle soup in a bowl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtM4ttBBrU8DNs0NqPeAo_cfSU6V-PiUi2pYmm5ahmIvrCHu-MFEs6aTDQLLepaSz2l3H6wuWc2jvgNGfGEFPHzINTXviMpQ07V-LD6ignHvctXkpaz5pmsweF8zUVNIuQTCHWrAKeDj5WhaAg8X03uhFp0N1Vpe7SzwbP_YJuxQlnMZk-dTVfxXCcmv9331xGb46eyKNDCs1sn7OkPtGbYBcaIa_7KyfZdO4GdJvn1EgF9m2ibC-mjczW5ZxT0SHyjrlmjyWYU7MQ"/>
+<span class="absolute top-3 left-3 bg-primary text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded">Local Favorite</span>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg leading-tight">Mỳ Quảng Cô Sáu</h3>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm fill-1">star</span>
+<span class="text-sm font-bold">4.9</span>
+</div>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm mb-2">Hải Châu • Vietnamese</p>
+<div class="flex items-center gap-2">
+<span class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded text-xs">$ • Cheap Eats</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Grid Item 2 -->
+<div class="masonry-item">
+<div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
+<div class="relative">
+<img class="w-full h-auto object-cover" data-alt="Selection of iced coffee drinks on a table" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7GvymdlUHcFEO0T_sHOdobQ0UAT4d5xxAsaXyEL1BIVG4GYSrU1Ji4Koa6rTky31oE0auACPqoWD13j_8223mEfwn7X9J2i585cGicwyDY6FJW-QePlD4Uuz4hcmQ8RV56tmWRo1bptLaq-T91AjeqwxeqyWAuMnIkM3BOddFfEIOyQaVXutLDN3gcqaTI2QsO0BcQz21qsXBOa7M67QYAd4eno7CBBrxotYrC8qY8wqQUJbvL44TjZPhR7IW_77iYeeqbYh5UcrJ"/>
+<span class="absolute top-3 left-3 bg-charcoal text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded">Trending</span>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg leading-tight">The Workshop Coffee</h3>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm fill-1">star</span>
+<span class="text-sm font-bold">4.7</span>
+</div>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm mb-2">Sơn Trà • Specialty Coffee</p>
+</div>
+</div>
+</div>
+<!-- Grid Item 3 -->
+<div class="masonry-item">
+<div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
+<div class="relative">
+<img class="w-full h-auto object-cover" data-alt="Grilled meat and vegetables on a plate" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_RTJOBdKpQoVeUrw3J631KB_Pd3OGGV_l00QyAE1wBw3KPD3QrhXQZ_DZLS5gNeq3_J5jKqRK7q4FZrPdgbFBKri69cLov6YChFnhXOs11IVQvgGIHkR0YYEorD1pUt7WRkENtQQO9a03xVMkDwXcJXYaytW8hSswNGuErUtSnjIjwG4_jc7klBxJcDsTrUf4mk6GCDGx82DLK7V2gYpv5_wv-xa92YdSCK-Ap2icbiq9rsE6K__Jo9oOpmG3fTmnd3Co0oazbP65"/>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg leading-tight">Nướng Ngon Da Nang</h3>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm fill-1">star</span>
+<span class="text-sm font-bold">4.8</span>
+</div>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm mb-2">Thanh Khê • BBQ</p>
+</div>
+</div>
+</div>
+<!-- Grid Item 4 -->
+<div class="masonry-item">
+<div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
+<div class="relative">
+<img class="w-full h-auto object-cover" data-alt="Vibrant healthy salad bowl with fresh ingredients" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQZq-GymkMC-YCdrQ2SX-qQRWcuNl45Sqmh35X5jcXOcNTv7abh7K-yIrkvsQ4eCCCkAkVm13aIMlIczpVEtEqPmfQUkWU-6EiaErBznrmkP7aTIEroiThtXwnUnlU1CdjAFs1o3zXG7w1FecQITTIM4HHElDS-2KsCOR8saovGlGHQnKNAT3uK4Heaw3bhxGfV5zklczQ0XlkLPGTe542FgRgv96VCI3xiL54t9S5qQHPV6LrSv93OfoDCgDrnFfv7j_0A4Bq75t-"/>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg leading-tight">Roots Plant-Based</h3>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm fill-1">star</span>
+<span class="text-sm font-bold">4.6</span>
+</div>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm mb-2">Ngũ Hành Sơn • Vegan</p>
+</div>
+</div>
+</div>
+<!-- Grid Item 5 -->
+<div class="masonry-item">
+<div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
+<div class="relative">
+<img class="w-full h-auto object-cover" data-alt="Fresh steamed shrimp with herbs" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAx2V2Ec9m81P2qBS3Jsnmfx8FNpCRl4x-0yoYOvIXivgSjGTDLELksegCHWdZjf4quvVsm422tkkFOi2ufVD8OO3FVyMJoD0TfTkMngqTyTSmaW8TrpSr-9gsXn6fhaFIMKzehk1j-Vy23NCTDsxmBvvUU9zndeNQCQZEYp_JUDjxIOo5Q-AfDIpXBVfj8t_UhCjm5CGQkGZkYykGLQgyr88A6j4mNdt1v-HuvE0XIhGnRrs8JKdSgAyXUWi1lz4e0zy89w1sfix2S"/>
+<span class="absolute top-3 left-3 bg-primary text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded">Tourist Favorite</span>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg leading-tight">Hải Sản Bà Thôi</h3>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm fill-1">star</span>
+<span class="text-sm font-bold">4.5</span>
+</div>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm mb-2">Sơn Trà • Seafood</p>
+</div>
+</div>
+</div>
+<!-- Grid Item 6 -->
+<div class="masonry-item">
+<div class="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
+<div class="relative">
+<img class="w-full h-auto object-cover" data-alt="Crispy spring rolls served with dipping sauce" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAwnUVeSW_fDiYnngfOm17ulZEHz3IUTywOtKoSrHuLEcDyqCbVRvvS8HgbyhLJmjO8VzvlcM5dE1ojz_lbPGCm90CLnAgud_Ma36LKBYl_Rg2D76I_g1KO4QEpGJiOlzCx-uok6UdPQT2YttOcpRrJFVFJi4alYlfX6cZyUFUVDq64e0VdZ3Czbu-IFttapfDqfT--hybrD-_bi4PZipzFiwDUZefxTNAEWrJ7p84zYHWRNJ8gbM8hfAnwJSvRAG31nOrWBmbnBqE"/>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg leading-tight">Bánh Xèo Tôm Nhảy</h3>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm fill-1">star</span>
+<span class="text-sm font-bold">4.9</span>
+</div>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm mb-2">Hải Châu • Central Specialty</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Load More -->
+<div class="flex justify-center py-12">
+<button class="px-8 py-3 rounded-xl border-2 border-charcoal/10 dark:border-white/10 font-bold hover:bg-charcoal hover:text-white dark:hover:bg-white dark:hover:text-charcoal transition-all">
+                    Show more spots
+                </button>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 py-12 mt-12">
+<div class="max-w-[1200px] mx-auto px-6 grid grid-cols-4 gap-8">
+<div class="col-span-1">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary font-bold">restaurant_menu</span>
+<h2 class="text-xl font-bold tracking-tight">Authentik</h2>
+</div>
+<p class="text-gray-500 text-sm leading-relaxed">
+                        Curating the most authentic culinary experiences in Da Nang. From hidden alleyways to coastal feasts.
+                    </p>
+</div>
+<div>
+<h4 class="font-bold mb-4">Explore</h4>
+<ul class="space-y-2 text-sm text-gray-500">
+<li class="hover:text-primary cursor-pointer">Collections</li>
+<li class="hover:text-primary cursor-pointer">Neighborhoods</li>
+<li class="hover:text-primary cursor-pointer">Best of 2024</li>
+<li class="hover:text-primary cursor-pointer">Street Food Map</li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-4">Support</h4>
+<ul class="space-y-2 text-sm text-gray-500">
+<li class="hover:text-primary cursor-pointer">Help Center</li>
+<li class="hover:text-primary cursor-pointer">Terms of Service</li>
+<li class="hover:text-primary cursor-pointer">Privacy Policy</li>
+<li class="hover:text-primary cursor-pointer">Contact Us</li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-4">Join Us</h4>
+<p class="text-sm text-gray-500 mb-4">Get the weekly 'Secret Spot' newsletter.</p>
+<div class="flex gap-2">
+<input class="bg-gray-100 dark:bg-gray-800 border-none rounded-lg flex-1 px-3 py-2 text-sm" placeholder="Email" type="email"/>
+<button class="bg-primary text-white p-2 rounded-lg">
+<span class="material-symbols-outlined text-sm">send</span>
+</button>
+</div>
+</div>
+</div>
+<div class="max-w-[1200px] mx-auto px-6 mt-12 pt-8 border-t border-gray-100 dark:border-gray-800 text-center text-xs text-gray-400">
+                © 2024 Authentik Da Nang. All rights reserved.
+            </div>
+</footer>
+</div>
+</body></html>

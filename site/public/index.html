@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentik - Discover Authentic Da Nang Food</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FAFAF9;
+            color: #1C1917;
+            line-height: 1.6;
+        }
+
+        /* Header */
+        header {
+            background: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 16px 0;
+        }
+
+        .header-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: #D97706;
+            text-decoration: none;
+        }
+
+        .search-bar {
+            flex: 1;
+            max-width: 500px;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 12px 20px;
+            border: 1px solid #E7E5E4;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            transition: all 200ms;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: #D97706;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+        }
+
+        .login-btn {
+            padding: 10px 24px;
+            background: #FFFFFF;
+            border: 2px solid #D97706;
+            color: #D97706;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 200ms;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .login-btn:hover {
+            background: #D97706;
+            color: #FFFFFF;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 48px 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 30px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: #78716C;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 24px 48px;
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .view-all {
+            color: #D97706;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .view-all:hover {
+            text-decoration: underline;
+        }
+
+        /* Collections Scroll */
+        .collections-scroll {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: #E7E5E4 transparent;
+        }
+
+        .collections-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .collections-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .collections-scroll::-webkit-scrollbar-thumb {
+            background: #E7E5E4;
+            border-radius: 4px;
+        }
+
+        .collection-card {
+            flex: 0 0 280px;
+            height: 280px;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            transition: transform 200ms;
+        }
+
+        .collection-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .collection-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .collection-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.7) 100%);
+            color: white;
+        }
+
+        .collection-name {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .collection-creator {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Masonry Grid */
+        .masonry-grid {
+            column-count: 3;
+            column-gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .masonry-grid {
+                column-count: 2;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .masonry-grid {
+                column-count: 1;
+            }
+        }
+
+        .restaurant-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            break-inside: avoid;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transition: all 200ms;
+            cursor: pointer;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .restaurant-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        }
+
+        .restaurant-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .restaurant-content {
+            padding: 20px;
+        }
+
+        .restaurant-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .badge-local {
+            background: #059669;
+            color: white;
+        }
+
+        .badge-tourist {
+            background: #3B82F6;
+            color: white;
+        }
+
+        .restaurant-meta {
+            font-size: 14px;
+            color: #78716C;
+            margin-bottom: 4px;
+        }
+
+        .restaurant-location {
+            font-size: 14px;
+            color: #78716C;
+        }
+
+        /* Load More */
+        .load-more {
+            text-align: center;
+            margin-top: 32px;
+        }
+
+        .load-more-btn {
+            padding: 12px 32px;
+            background: #D97706;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 200ms;
+        }
+
+        .load-more-btn:hover {
+            background: #B45309;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .filter-dropdown {
+            padding: 10px 16px;
+            border: 1px solid #E7E5E4;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            background: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="logo">Authentik</a>
+            <div class="search-bar">
+                <input type="text" placeholder="Search Da Nang restaurants...">
+            </div>
+            <a href="#" class="login-btn">Login</a>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <div class="hero">
+        <h1>Discover Authentic Da Nang Food</h1>
+        <p>Where locals actually eat</p>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Featured Collections -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Featured Collections</h2>
+                <a href="#" class="view-all">View All →</a>
+            </div>
+            <div class="collections-scroll">
+                <div class="collection-card">
+                    <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=400&fit=crop" alt="Street Food Gems">
+                    <div class="collection-overlay">
+                        <div class="collection-name">Street Food Gems</div>
+                        <div class="collection-creator">by Vinh Le</div>
+                    </div>
+                </div>
+                <div class="collection-card">
+                    <img src="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=400&h=400&fit=crop" alt="Seafood Paradise">
+                    <div class="collection-overlay">
+                        <div class="collection-name">Seafood Paradise</div>
+                        <div class="collection-creator">by Food Vlog</div>
+                    </div>
+                </div>
+                <div class="collection-card">
+                    <img src="https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=400&h=400&fit=crop" alt="Hidden Cafes">
+                    <div class="collection-overlay">
+                        <div class="collection-name">Hidden Cafes</div>
+                        <div class="collection-creator">by Da Nang Eats</div>
+                    </div>
+                </div>
+                <div class="collection-card">
+                    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop" alt="Breakfast Spots">
+                    <div class="collection-overlay">
+                        <div class="collection-name">Breakfast Spots</div>
+                        <div class="collection-creator">by Local Guide</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restaurant Grid -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Local Favorites</h2>
+                <div class="filters">
+                    <select class="filter-dropdown">
+                        <option>All Cuisines</option>
+                        <option>Vietnamese</option>
+                        <option>Seafood</option>
+                        <option>International</option>
+                    </select>
+                    <select class="filter-dropdown">
+                        <option>All Neighborhoods</option>
+                        <option>Hải Châu</option>
+                        <option>Sơn Trà</option>
+                        <option>Thanh Khê</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="masonry-grid">
+                <!-- Card 1 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&h=400&fit=crop" alt="Quán Bún Chả Cá">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Quán Bún Chả Cá</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $$</div>
+                        <div class="restaurant-location">📍 Hải Châu</div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1569562211093-4ed0d0758f12?w=600&h=500&fit=crop" alt="Nhà Hàng Bà Dưỡng">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Nhà Hàng Bà Dưỡng</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Thanh Khê</div>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600&h=350&fit=crop" alt="Madame Lân">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Madame Lân</div>
+                        <span class="badge badge-tourist">🏖️ Tourist Spot</span>
+                        <div class="restaurant-meta">Vietnamese • $$$</div>
+                        <div class="restaurant-location">📍 Sơn Trà</div>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1555126634-323283e090fa?w=600&h=450&fit=crop" alt="Quán Mì Quảng Bà Mua">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Quán Mì Quảng Bà Mua</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Hải Châu</div>
+                    </div>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=400&fit=crop" alt="Waterfront Restaurant">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Waterfront Restaurant</div>
+                        <span class="badge badge-tourist">🏖️ Tourist Spot</span>
+                        <div class="restaurant-meta">Seafood • $$$$</div>
+                        <div class="restaurant-location">📍 Sơn Trà</div>
+                    </div>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&h=380&fit=crop" alt="Cơm Gà Bà Nga">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Cơm Gà Bà Nga</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Thanh Khê</div>
+                    </div>
+                </div>
+
+                <!-- Card 7 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&h=420&fit=crop" alt="Bánh Tráng Cuốn Thịt Heo">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Bánh Tráng Cuốn Thịt Heo</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Hải Châu</div>
+                    </div>
+                </div>
+
+                <!-- Card 8 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=600&h=350&fit=crop" alt="The Deck House">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">The Deck House</div>
+                        <span class="badge badge-tourist">🏖️ Tourist Spot</span>
+                        <div class="restaurant-meta">International • $$$</div>
+                        <div class="restaurant-location">📍 Sơn Trà</div>
+                    </div>
+                </div>
+
+                <!-- Card 9 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1585032226651-759b368d7246?w=600&h=480&fit=crop" alt="Phở Bà Duyên">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Phở Bà Duyên</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Hải Châu</div>
+                    </div>
+                </div>
+
+                <!-- Card 10 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1551218808-94e220e084d2?w=600&h=400&fit=crop" alt="Bánh Xèo Bà Dưỡng">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Bánh Xèo Bà Dưỡng</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $$</div>
+                        <div class="restaurant-location">📍 Thanh Khê</div>
+                    </div>
+                </div>
+
+                <!-- Card 11 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1562158147-f8c6c1e2e8c7?w=600&h=360&fit=crop" alt="Nem Lụi Quán Bà Mua">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Nem Lụi Quán Bà Mua</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Hải Châu</div>
+                    </div>
+                </div>
+
+                <!-- Card 12 -->
+                <div class="restaurant-card">
+                    <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=440&fit=crop" alt="Chè Bà Thìn">
+                    <div class="restaurant-content">
+                        <div class="restaurant-name">Chè Bà Thìn</div>
+                        <span class="badge badge-local">🌟 Local Favorite</span>
+                        <div class="restaurant-meta">Vietnamese • $</div>
+                        <div class="restaurant-location">📍 Thanh Khê</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="load-more">
+                <button class="load-more-btn">Load More</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

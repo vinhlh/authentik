@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Authentik Da Nang | Authentic Food Discovery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ff385d",
+                        "background-light": "#ffffff",
+                        "background-dark": "#230f13",
+                        "airbnb-teal": "#00A699",
+                        "dark-teal": "#008489",
+                        "muted": "#717171",
+                        "border-light": "#EBEBEB"
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .masonry {
+            column-count: 3;
+            column-gap: 1.5rem;
+        }
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 1024px) {
+            .masonry { column-count: 2; }
+        }
+        @media (max-width: 640px) {
+            .masonry { column-count: 1; }
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#1d0c0f]">
+<!-- Sticky Navigation Bar -->
+<header class="sticky top-0 z-50 w-full bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-light dark:border-white/10">
+<div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+<!-- Logo -->
+<div class="flex items-center gap-2 cursor-pointer">
+<div class="text-primary">
+<svg fill="none" height="32" viewbox="0 0 32 32" width="32" xmlns="http://www.w3.org/2000/svg">
+<path d="M16 2L4 28L16 22L28 28L16 2Z" fill="currentColor"></path>
+</svg>
+</div>
+<h1 class="text-primary text-xl font-bold tracking-tight">Authentik</h1>
+</div>
+<!-- Search Bar -->
+<div class="hidden md:flex items-center border border-border-light dark:border-white/20 rounded-full py-2 px-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white dark:bg-zinc-900">
+<button class="px-4 border-r border-border-light dark:border-white/10 text-sm font-semibold">Anywhere</button>
+<button class="px-4 border-r border-border-light dark:border-white/10 text-sm font-semibold">Any week</button>
+<button class="px-4 text-muted dark:text-zinc-400 text-sm">Add guests</button>
+<div class="ml-2 bg-primary p-2 rounded-full text-white flex items-center justify-center">
+<span class="material-symbols-outlined !text-lg">search</span>
+</div>
+</div>
+<!-- User Menu -->
+<div class="flex items-center gap-4">
+<a class="hidden lg:block text-sm font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 px-4 py-2 rounded-full transition-colors" href="#">Become a Host</a>
+<div class="flex items-center gap-3 border border-border-light dark:border-white/20 p-2 rounded-full hover:shadow-md transition-shadow cursor-pointer bg-white dark:bg-zinc-900">
+<span class="material-symbols-outlined text-zinc-500">menu</span>
+<div class="w-8 h-8 bg-zinc-500 rounded-full flex items-center justify-center text-white">
+<span class="material-symbols-outlined !text-xl">person</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-6">
+<!-- Hero Section -->
+<section class="py-16 text-center">
+<h1 class="text-[#1d0c0f] dark:text-white tracking-tight text-[32px] font-bold leading-tight mb-2">
+                Discover Authentic Da Nang Food
+            </h1>
+<p class="text-muted dark:text-zinc-400 text-base font-normal">
+                Where locals actually eat
+            </p>
+</section>
+<!-- Featured Collections (Horizontal Scroll) -->
+<section class="mb-12">
+<div class="flex items-center justify-between mb-6">
+<h2 class="text-xl font-bold">Featured Collections</h2>
+<div class="flex gap-2">
+<button class="p-2 border border-border-light dark:border-white/10 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-2 border border-border-light dark:border-white/10 rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="flex gap-6 overflow-x-auto hide-scrollbar pb-4 -mx-1 px-1">
+<!-- Collection Card 1 -->
+<div class="min-w-[280px] h-[280px] relative rounded-xl overflow-hidden group cursor-pointer">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Colorful Vietnamese street food stall with fresh ingredients" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAvpDmJFjChSJgp4z0r_4oYZA6hmnUqRA7Pa-ULUNVR5IKjSh9LGnLy8oQCrFKA6RhENGYbLpJFDbJJR1Ky8spNWmJBVNTgscEtfx_BeC_ntcjHZvMCW6pOE_l123C-5OIUE70YrxLyW8W_vQxJOlh5y5AbQs_4DVInlZ_YZnsNuNUx0N445b8xup0-cj-mkdce-LT0ty1biTQ0p2KWjL6_ecNSSYCe09H3HjqYNR7mruTtgWBAMr0SFZAZYhN4r8GwtOdxGd8ldkcS");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<p class="text-white text-lg font-bold">Street Food Gems</p>
+</div>
+</div>
+<!-- Collection Card 2 -->
+<div class="min-w-[280px] h-[280px] relative rounded-xl overflow-hidden group cursor-pointer">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Grilled seafood on a beachside dining table" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAAGwKG_vHUz7a5BmxXbwmcmLgrMQ3C7xdXjtZQBdLUFwJn-GgpE27h3M4uTYpJT8GDIeVsBzP3MFfpRu7QtwUQHnJutlmoLqRPxITBRBLfC1kukH91NjWNVM8l9vg4GFyfUW4yfX-4JicG6byaPB9ddlvnQ6Wo7wpbpEiGO3B7hRfrKSYg2ibry3om8rbyJEPOyRIMhRJ9JD8gHOvG1s3ejyjss290OJVlh93NOzdGTyO0xi5ZjrnYE_jnlAgMC9x4E0qX6jwbAxOm");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<p class="text-white text-lg font-bold">Oceanfront Dining</p>
+</div>
+</div>
+<!-- Collection Card 3 -->
+<div class="min-w-[280px] h-[280px] relative rounded-xl overflow-hidden group cursor-pointer">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Cozy hidden cafe with lush greenery" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuABCZ0Dk1uRHQqGJZivCu_5iuKnAfKOM8JoZgFTRoTZ5OsmEzWqcmeSCHRxx_-qO0tdykymDD2xpBKFq9T8o3MOMZ1628MihpQjO7MsKEsozXAUpstFnpabdUZqXhqohqCACNzN1M825-ly4e8YxGoVC3qAA0QhMB5P5MORxGYfxeyuchxs-54p4h2TZFIn5HqqazjDdHS1q9ObS0lKMYBUoKIMLzTqbT6uqAslaKbrL1DP6NdPH0NV3t9gbZ0HLOO4_E5UaADkVxQn");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<p class="text-white text-lg font-bold">Hidden Cafes</p>
+</div>
+</div>
+<!-- Collection Card 4 -->
+<div class="min-w-[280px] h-[280px] relative rounded-xl overflow-hidden group cursor-pointer">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Late night noodle shop with neon lights" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC62YqDU7i4ItTrOMc643sTvVbYw_waYERSA7ySqLb2H-0bDtVelGOAZlm_bEhfg07aGRKdHL4Yyue9kqPUuNuVjugzlp30Z-mbjOUXSu5KhZb1tn8qR6b5-JDHe0MQahgPcX_W_A1fNn3I_vyVoePjHVsxYSWF8qVotzudPmKiakx8PpqMezPGqg1Mo2nvvalY4NKS7xyKg8DPxFVtvktkuV5dVuLSlYFIY7vfniKrOn-LdiFwFBmutz2C-dThBqebS6UeH0WpG9rM");'></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<div class="absolute bottom-4 left-4">
+<p class="text-white text-lg font-bold">Late Night Eats</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Masonry Grid -->
+<section class="pb-16">
+<div class="masonry">
+<!-- Card 1: Quán Bún Chả Cá -->
+<div class="masonry-item group cursor-pointer">
+<div class="border border-border-light dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+<div class="relative w-full aspect-[4/5] bg-cover bg-center" data-alt="Traditional Vietnamese fish cake noodle soup bowl" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDi9Eout8swEXoUKgh-oh0Xad43fvMDzGzL0Pp4JiQFIkLH2cOUaDv5BUDLZp4WMoUabYX0PdUGKIU4mloYeINNHLteW-ehxy-CD-4V7sTYxJh2y7QCr2YxKs3NZ8XnXmshzenDOWguyxyROQHMbLcGZPULfXK6FaBZItor-2S8KDfQPGsW0OysETY_ilmWy7UJqpbVB1KyTLF7OuhhCrOtpkSjIio0uzmRGcD1vo7VQ2d3AejLDiFp0WHXRU8TL3bRnsADHnl2CtCA");'>
+<div class="absolute top-4 right-4 text-white drop-shadow-md">
+<span class="material-symbols-outlined !text-2xl hover:text-primary transition-colors">favorite</span>
+</div>
+</div>
+<div class="p-5">
+<div class="flex gap-2 mb-3">
+<span class="bg-airbnb-teal text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Local Favorite</span>
+</div>
+<h3 class="text-xl font-bold mb-1">Quán Bún Chả Cá</h3>
+<p class="text-muted dark:text-zinc-400 text-sm mb-2">Vietnamese • $$</p>
+<div class="flex items-center text-muted dark:text-zinc-400 text-sm gap-1">
+<span class="material-symbols-outlined !text-base">location_on</span>
+<span>Hải Châu District</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 2: Madame Lân -->
+<div class="masonry-item group cursor-pointer">
+<div class="border border-border-light dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+<div class="relative w-full aspect-[3/4] bg-cover bg-center" data-alt="Gourmet Vietnamese spring rolls platter" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBTZKzX9Z5YkMSECj7TNxyYo5GL6G_8-H6JAjzYK7mtsw4zSSE-5jbimICIZfCwpUGgTK0SZIRRNvDL-SvmY8t1yOI74D8OP1u_ZMEFAYjeZ32k4OJ9cc2YqJdIDOZd0Tk1n_TSrb36_vr3M2WniOMojbFpX9V3lkTwI53r9nWGAYPoDN0oNc52lwukfdT8JIcs2e1u2e5aBU0yI7B0ZWszhdK5BbCnYNUAUsAUl4pq06n2nT7-zORmr-RR3EXTSqmLAAlyS4GCEzxk");'>
+<div class="absolute top-4 right-4 text-white drop-shadow-md">
+<span class="material-symbols-outlined !text-2xl hover:text-primary transition-colors">favorite</span>
+</div>
+</div>
+<div class="p-5">
+<div class="flex gap-2 mb-3">
+<span class="bg-dark-teal text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Tourist Spot</span>
+</div>
+<h3 class="text-xl font-bold mb-1">Madame Lân</h3>
+<p class="text-muted dark:text-zinc-400 text-sm mb-2">Vietnamese • $$$</p>
+<div class="flex items-center text-muted dark:text-zinc-400 text-sm gap-1">
+<span class="material-symbols-outlined !text-base">location_on</span>
+<span>Thạch Thang, Hải Châu</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 3: Cơm Gà Bà Nga -->
+<div class="masonry-item group cursor-pointer">
+<div class="border border-border-light dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+<div class="relative w-full aspect-square bg-cover bg-center" data-alt="Yellow turmeric chicken rice with fresh herbs" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB5AzS5qM_bbo3v34r9FQwME4yuUw24amAqb9DOMPYAMfhbH3ojJr-QxRzvPnUA3gWI5J8SadmKVEFBwh2L8QqA1pq7WGSz50EjKAiQOzHU4VguJ2Y7CYbRbfVx6b62Pb-9FSTZPFn--8VEMjmbC6hPuhKoubqkjcQqJmGIxxlMFRLX0w6xbQjUgwubLE-RrZcpdCNIQBS108_4RmRpTWRVCAHIFfqGBChofHgIp2d00sIB3jmEtyU_pDhOiniikqh0sFwc8oB-OrbB");'>
+<div class="absolute top-4 right-4 text-white drop-shadow-md">
+<span class="material-symbols-outlined !text-2xl hover:text-primary transition-colors">favorite</span>
+</div>
+</div>
+<div class="p-5">
+<div class="flex gap-2 mb-3">
+<span class="bg-airbnb-teal text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Local Favorite</span>
+</div>
+<h3 class="text-xl font-bold mb-1">Cơm Gà Bà Nga</h3>
+<p class="text-muted dark:text-zinc-400 text-sm mb-2">Vietnamese • $$</p>
+<div class="flex items-center text-muted dark:text-zinc-400 text-sm gap-1">
+<span class="material-symbols-outlined !text-base">location_on</span>
+<span>Phước Ninh, Hải Châu</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Additional Placeholder for Masonry aesthetic -->
+<div class="masonry-item group cursor-pointer">
+<div class="border border-border-light dark:border-white/10 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+<div class="relative w-full aspect-[4/6] bg-cover bg-center" data-alt="Steaming hot Mi Quang bowl with shrimp and pork" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAUfifA_-4rYG2jmGgIwALhySK6cElE22baezhRUAfm0qONQpQL_EDUB-hNI7-_FUKFwO_vp_dOKVaeJJnMS-y7rjmSK5jfet1Tl1HzXcFudXvKDsUGe1O3vTOS2FGP2IWpeAhUKAxtZBOQJ_xyNDh8mJiQQGBFy4LMWDXP6NVEd-MCyZwgny8idHg0F7LWdwYVr0PpmpDv9ww3W_6cmybwv6fmWFYpR6LRBQ9qPEzxF-nfHlosH1DauQ7DPpBEKBKpv0TWDBHgMxs-");'>
+</div>
+<div class="p-5">
+<div class="flex gap-2 mb-3">
+<span class="bg-airbnb-teal text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Local Favorite</span>
+</div>
+<h3 class="text-xl font-bold mb-1">Mì Quảng Thi</h3>
+<p class="text-muted dark:text-zinc-400 text-sm mb-2">Vietnamese • $</p>
+<div class="flex items-center text-muted dark:text-zinc-400 text-sm gap-1">
+<span class="material-symbols-outlined !text-base">location_on</span>
+<span>Hải Châu 1</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Load More Action -->
+<div class="flex justify-center mt-12">
+<button class="bg-primary hover:bg-primary/90 text-white font-bold py-3 px-8 rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95">
+                    Load More Authentic Eats
+                </button>
+</div>
+</section>
+</main>
+<!-- Simple Footer -->
+<footer class="border-t border-border-light dark:border-white/10 bg-zinc-50 dark:bg-zinc-900/50 py-12">
+<div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8">
+<div class="col-span-1">
+<h4 class="font-bold mb-4">Support</h4>
+<ul class="text-sm text-muted dark:text-zinc-400 space-y-2">
+<li><a class="hover:underline" href="#">Help Centre</a></li>
+<li><a class="hover:underline" href="#">Safety information</a></li>
+<li><a class="hover:underline" href="#">Cancellation options</a></li>
+</ul>
+</div>
+<div class="col-span-1">
+<h4 class="font-bold mb-4">Community</h4>
+<ul class="text-sm text-muted dark:text-zinc-400 space-y-2">
+<li><a class="hover:underline" href="#">Local Foodies</a></li>
+<li><a class="hover:underline" href="#">Authentik.org</a></li>
+<li><a class="hover:underline" href="#">Combat food waste</a></li>
+</ul>
+</div>
+<div class="col-span-1">
+<h4 class="font-bold mb-4">Authentik</h4>
+<ul class="text-sm text-muted dark:text-zinc-400 space-y-2">
+<li><a class="hover:underline" href="#">Newsroom</a></li>
+<li><a class="hover:underline" href="#">Careers</a></li>
+<li><a class="hover:underline" href="#">Investors</a></li>
+</ul>
+</div>
+<div class="col-span-1">
+<h4 class="font-bold mb-4">Social</h4>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-zinc-600 cursor-pointer">social_leaderboard</span>
+<span class="material-symbols-outlined text-zinc-600 cursor-pointer">share</span>
+<span class="material-symbols-outlined text-zinc-600 cursor-pointer">language</span>
+</div>
+</div>
+</div>
+<div class="max-w-7xl mx-auto px-6 mt-12 pt-8 border-t border-border-light dark:border-white/10 flex flex-col md:flex-row justify-between items-center text-sm text-muted">
+<p>© 2024 Authentik, Inc. · Privacy · Terms · Sitemap</p>
+<div class="flex items-center gap-4 mt-4 md:mt-0 font-semibold text-[#1d0c0f] dark:text-white">
+<div class="flex items-center gap-1 cursor-pointer">
+<span class="material-symbols-outlined !text-base">public</span>
+<span>English (US)</span>
+</div>
+<div class="flex items-center gap-1 cursor-pointer">
+<span>$</span>
+<span>USD</span>
+</div>
+</div>
+</div>
+</footer>
+</body></html>
