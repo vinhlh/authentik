@@ -69,24 +69,42 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
         `)
         .eq('collection_id', id);
 
+      console.log(`[DEBUG] Collection ID: ${id}`);
+      console.log(`[DEBUG] relData count: ${relData?.length}`);
+      if (relError) console.error(`[DEBUG] relError:`, relError);
+
+      if (relData && relData.length > 0) {
+        // debug first item
+        console.log(`[DEBUG] First item restaurant:`, relData[0].restaurant);
+      } else {
+        console.log(`[DEBUG] No relData found or empty array`);
+      }
+
       if (relData) {
         restaurants = relData
           .filter((item: any) => item.restaurant)
           .map((item: any) => {
-            const r = item.restaurant;
+            const r = item.restaurant; // Assuming 'r' is defined here from item.restaurant
+            const details = r.authenticity_details || {};
+            const badgeLabel = details.badgeLabel ||
+              (r.classification === 'LOCAL_FAVORITE' ? 'Local Favorite' : r.classification === 'TOURIST_SPOT' ? 'Tourist Spot' : undefined);
+
+            // Use signals as tags if available, otherwise fallback to cuisine/dishes
+            const signalTags = details.signals?.map((s: any) => s.name) || [];
+            const displayTags = [...signalTags, ...(item.recommended_dishes || r.cuisine_type || ["Local"])].slice(0, 2);
+
             return {
               id: r.id,
               name: r.name,
-              rating: r.authenticity_score ? Number((3 + r.authenticity_score * 2).toFixed(1)) : 4.5,
-              location: r.address?.split(',').slice(-2, -1)[0]?.trim() || "Da Nang",
+              rating: r.google_rating || (r.authenticity_score ? Number((3 + r.authenticity_score * 2).toFixed(1)) : 4.5),
+              // User requested specialties instead of location for Collection view
+              location: item.recommended_dishes?.slice(0, 2).join(", ") || r.cuisine_type?.[0] || "Specialty Food",
               cuisine: r.cuisine_type?.[0] || "Vietnamese",
               price: ["$", "$$", "$$$", "$$$$"][(r.price_level || 1) - 1] || "$",
-              tags: item.recommended_dishes || r.cuisine_type?.slice(0, 2) || ["Local"],
-              image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000",
+              tags: displayTags,
+              image: r.images?.[0] || "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000",
               alt: r.name,
-              badge: r.classification === 'LOCAL_FAVORITE'
-                ? { text: "Local Favorite", type: "local" }
-                : undefined
+              badge: badgeLabel ? { text: badgeLabel, type: "local" } : undefined
             } as Restaurant;
           });
       }
@@ -127,24 +145,24 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
           alt={collection.name}
           className="w-full h-full object-cover opacity-60"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#fafaf9] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
-        <div className="absolute top-6 left-6">
-          <Link href="/" className="bg-white/90 p-2 rounded-full flex items-center gap-2 hover:bg-white transition-colors text-sm font-semibold">
+        <div className="absolute top-6 left-6 z-10">
+          <Link href="/" className="bg-white/20 backdrop-blur-md p-2 rounded-full flex items-center gap-2 hover:bg-white/30 transition-colors text-sm font-semibold text-white border border-white/20">
             <ArrowLeft className="w-4 h-4" /> Back
           </Link>
         </div>
 
-        <div className="absolute bottom-0 left-0 w-full p-6 pb-12 max-w-[1200px] mx-auto">
+        <div className="absolute bottom-0 left-0 w-full p-6 pb-12 max-w-[1200px] mx-auto z-10">
           <div className="max-w-3xl">
-            <span className="bg-[#db7706] text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 inline-block">
+            <span className="bg-[#db7706]/90 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 inline-block shadow-sm">
               Curated by {collection.creator_name || "Authentik"}
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold text-[#1c1917] mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-md">
               {collection.name}
             </h1>
             {collection.description && (
-              <p className="text-lg text-gray-700 font-medium max-w-2xl">
+              <p className="text-lg text-gray-200 font-medium max-w-2xl line-clamp-3 drop-shadow-sm leading-relaxed">
                 {collection.description}
               </p>
             )}

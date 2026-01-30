@@ -38,7 +38,7 @@ export default async function HomePage() {
         name: r.name,
         // Use authenticity score to mock rating if actual rating (cache) is missing
         rating: r.authenticity_score ? Number((3 + r.authenticity_score * 2).toFixed(1)) : 4.5,
-        location: r.address?.split(',').slice(-2, -1)[0]?.trim() || "Da Nang",
+        location: r.address?.split(',').slice(-2, -1)[0]?.trim().replace(/\s*\d{4,}(?:\s*-[a-zA-Z0-9]+)?$/, '') || "Da Nang",
         cuisine: r.cuisine_type?.[0] || "Vietnamese",
         price: ["$", "$$", "$$$", "$$$$"][(r.price_level || 1) - 1] || "$",
         tags: r.cuisine_type?.slice(0, 2) || ["Local"],
@@ -63,11 +63,11 @@ export default async function HomePage() {
       {/* Hero / Collections Section */}
       <HeroCollections collections={collections} />
 
-      {/* Filter Bar */}
-      <FilterBar />
+      {/* Filter Bar - Removed per user request */}
+      {/* <FilterBar /> */}
 
-      {/* Discovery Grid */}
-      <MasonryGrid restaurants={restaurants} />
+      {/* Discovery Grid - Removed per user request */}
+      {/* <MasonryGrid restaurants={restaurants} /> */}
     </main>
   );
 }

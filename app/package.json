@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "extract": "tsx workers/extract.ts",
+    "process-photos": "tsx workers/process-ai.ts",
     "extract:batch": "tsx workers/extract.ts batch",
     "discover": "tsx workers/discover.ts",
     "migrate": "tsx scripts/migrate.ts",

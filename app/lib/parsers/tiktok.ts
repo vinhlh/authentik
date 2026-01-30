@@ -1,194 +1,186 @@
 /**
  * TikTok Video Parser
- * Extracts restaurant information from TikTok food review videos
+ * Uses Gemini Multimodal (Video/Audio) to extract restaurant data
  */
 
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+import { exec } from 'child_process'
+import util from 'util'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { RestaurantMention } from './youtube'
 
+const execAsync = util.promisify(exec)
+
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+
+/**
+ * TikTok Metadata structure
+ */
 export interface TikTokVideoMetadata {
   videoId: string
   description: string
   authorName: string
-  authorId: string
-  createTime: number
-  duration: number
-  playCount: number
-  likeCount: number
-  commentCount: number
-  shareCount: number
   hashtags: string[]
+  url: string
 }
 
 /**
- * Extract video ID from TikTok URL
- */
-export function extractTikTokVideoId(url: string): string | null {
-  const patterns = [
-    /tiktok\.com\/@[\w.-]+\/video\/(\d+)/,
-    /tiktok\.com\/v\/(\d+)/,
-    /vm\.tiktok\.com\/([A-Za-z0-9]+)/,
-  ]
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern)
-    if (match) {
-      return match[1]
-    }
-  }
-
-  return null
-}
-
-/**
- * Get TikTok video metadata
- * Note: TikTok doesn't have an official public API
- * This would require web scraping or unofficial API
- */
-export async function getTikTokVideoMetadata(
-  videoId: string
-): Promise<TikTokVideoMetadata | null> {
-  try {
-    // This would use web scraping or unofficial TikTok API
-    // For now, return null to indicate it needs implementation
-    console.log(`Getting TikTok metadata for video: ${videoId}`)
-
-    // Example implementation would use:
-    // - Playwright/Puppeteer for web scraping
-    // - Or unofficial TikTok API wrapper
-
-    return null
-  } catch (error) {
-    console.error('Error fetching TikTok metadata:', error)
-    return null
-  }
-}
-
-/**
- * Extract text from TikTok video
- * This includes:
- * - Video description
- * - On-screen text (OCR)
- * - Audio transcription (if available)
- */
-export async function extractTikTokText(videoId: string): Promise<{
-  description: string
-  onScreenText: string[]
-  audioTranscript: string | null
-}> {
-  try {
-    // This would involve:
-    // 1. Getting video description from metadata
-    // 2. Downloading video and running OCR on frames
-    // 3. Extracting audio and transcribing
-
-    console.log(`Extracting text from TikTok video: ${videoId}`)
-
-    return {
-      description: '',
-      onScreenText: [],
-      audioTranscript: null,
-    }
-  } catch (error) {
-    console.error('Error extracting TikTok text:', error)
-    return {
-      description: '',
-      onScreenText: [],
-      audioTranscript: null,
-    }
-  }
-}
-
-/**
- * Extract restaurant mentions from TikTok content
- */
-export async function extractRestaurantsFromTikTok(
-  metadata: TikTokVideoMetadata,
-  textContent: {
-    description: string
-    onScreenText: string[]
-    audioTranscript: string | null
-  }
-): Promise<RestaurantMention[]> {
-  // Combine all text sources
-  const allText = [
-    textContent.description,
-    ...textContent.onScreenText,
-    textContent.audioTranscript || '',
-  ].join('\n')
-
-  // Extract hashtags that might indicate location
-  // const locationHashtags = metadata.hashtags.filter(tag =>
-  //   tag.toLowerCase().includes('danang') ||
-  //   tag.toLowerCase().includes('vietnam') ||
-  //   tag.toLowerCase().includes('food')
-  // )
-
-  const prompt = `
-Extract restaurant information from this TikTok food review.
-Return a JSON array of restaurants with the following structure:
-{
-  "name": "Restaurant name",
-  "address": "Full address if mentioned",
-  "dishes": ["dish1", "dish2"],
-  "priceRange": "$ or $$ or $$$ or $$$$",
-  "notes": "Any special notes or recommendations"
-}
-
-Content:
-${allText}
-
-Hashtags: ${metadata.hashtags.join(', ')}
-Author: ${metadata.authorName}
-`
-
-  // TODO: Implement AI extraction using Gemini Flash or GPT
-  console.log('Extracting restaurants from TikTok...')
-  console.log('Prompt:', prompt)
-
-  return []
-}
-
-/**
- * Parse TikTok video and extract restaurant data
- * Main entry point for TikTok video processing
+ * Main entry point: Parse TikTok video
  */
 export async function parseTikTokVideo(url: string): Promise<{
   metadata: TikTokVideoMetadata | null
   restaurants: RestaurantMention[]
 }> {
-  const videoId = extractTikTokVideoId(url)
+  console.log(`🎬 Processing TikTok: ${url}`)
 
-  if (!videoId) {
-    throw new Error('Invalid TikTok URL')
+  // Guard: Reject channel URLs
+  if (url.includes('/@') && !url.includes('/video/')) {
+    throw new Error('❌ This looks like a Channel URL. Please use "npm run discover" for channels, or provide a specific video URL.')
   }
 
-  // Get video metadata
-  const metadata = await getTikTokVideoMetadata(videoId)
-
-  if (!metadata) {
-    throw new Error('Could not fetch TikTok video metadata')
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is required for TikTok extraction')
   }
 
-  // Extract text content
-  const textContent = await extractTikTokText(videoId)
+  const tempDir = os.tmpdir()
+  const tempFile = path.join(tempDir, `tiktok-${Date.now()}.mp4`)
 
-  // Extract restaurants
-  const restaurants = await extractRestaurantsFromTikTok(metadata, textContent)
+  try {
+    // 1. Get Metadata first (fast)
+    const metadata = await extractMetadata(url)
+    console.log(`   📝 Title: ${metadata.description.slice(0, 50)}...`)
+    console.log(`   👤 Author: ${metadata.authorName}`)
 
-  return { metadata, restaurants }
+    // 2. Download Video (yt-dlp)
+    console.log('   ⬇️  Downloading video for AI analysis...')
+    await downloadVideo(url, tempFile)
+
+    // 3. Upload to Gemini
+    console.log('   🧠 Sending to Gemini 1.5 Flash (Multimodal)...')
+    const restaurants = await extractWithGemini(tempFile, metadata)
+
+    return { metadata, restaurants }
+
+  } catch (error) {
+    console.error('Error parsing TikTok:', error)
+    throw error
+  } finally {
+    // Cleanup
+    if (fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile)
+    }
+  }
 }
 
 /**
- * Determine video platform from URL
+ * Extract basic metadata using yt-dlp --dump-json
+ */
+async function extractMetadata(url: string): Promise<TikTokVideoMetadata> {
+  const { stdout } = await execAsync(`yt-dlp --dump-json "${url}"`, { maxBuffer: 10 * 1024 * 1024 })
+  const data = JSON.parse(stdout)
+
+  return {
+    videoId: data.id,
+    description: data.description || data.title || '',
+    authorName: data.uploader || 'Unknown',
+    hashtags: data.tags || [],
+    url: data.webpage_url || url
+  }
+}
+
+/**
+ * Download video to temp file
+ */
+async function downloadVideo(url: string, outputPath: string) {
+  // Download best quality that is mp4
+  await execAsync(`yt-dlp -f "best[ext=mp4]" -o "${outputPath}" "${url}"`)
+}
+
+/**
+ * Upload file to Gemini and extract structured data
+ */
+async function extractWithGemini(
+  filePath: string,
+  metadata: TikTokVideoMetadata
+): Promise<RestaurantMention[]> {
+  // Read file as base64
+  const fileData = fs.readFileSync(filePath)
+  const base64Data = fileData.toString('base64')
+
+  const prompt = `
+  You are an expert food critic assistant.
+  Watch this TikTok video and extract restaurant recommendations.
+
+  Context:
+  - Description: ${metadata.description}
+  - Author: ${metadata.authorName}
+  - Location context: Da Nang, Vietnam
+
+  Task:
+  1. Identify any restaurants or food stalls mentioned or shown.
+  2. Extract the name, approximate address, recommended dishes, and price estimation.
+  3. Ignore non-food places.
+
+  Output ONLY valid JSON array with this structure:
+  [
+    {
+      "name": "Restaurant Name",
+      "address": "Address or location description",
+      "dishes": ["dish 1", "dish 2"],
+      "priceRange": "Cheap ($) or Moderate ($$) or Expensive ($$$)",
+      "description": "Brief summary of the review"
+    }
+  ]
+  If no restaurants found, return []
+  `
+
+  const result = await model.generateContent([
+    {
+      inlineData: {
+        mimeType: "video/mp4",
+        data: base64Data
+      }
+    },
+    { text: prompt }
+  ])
+
+  const response = result.response
+  const text = response.text()
+
+  // Clean JSON (handle markdown code blocks)
+  let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim()
+
+  // Find array
+  const jsonMatch = cleanText.match(/\[[\s\S]*\]/)
+  if (!jsonMatch) return []
+
+  try {
+    const rawData = JSON.parse(jsonMatch[0])
+
+    // Map to RestaurantMention
+    return rawData.map((item: any) => ({
+      name: item.name,
+      address: item.address || '',
+      dishes: item.dishes || [],
+      priceRange: item.priceRange,
+      description: item.description || '',
+      timestamp: 0 // Cannot easily get timestamp from Gemini yet without more complex prompting
+    }))
+  } catch (e) {
+    console.error('Failed to parse Gemini JSON:', text)
+    return []
+  }
+}
+
+/**
+ * Platform detection helper
  */
 export function detectVideoPlatform(url: string): 'youtube' | 'tiktok' | 'unknown' {
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    return 'youtube'
-  }
-
-  if (url.includes('tiktok.com')) {
-    return 'tiktok'
-  }
-
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube'
+  if (url.includes('tiktok.com')) return 'tiktok'
   return 'unknown'
 }

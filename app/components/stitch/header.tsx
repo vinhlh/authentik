@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Heart, Menu, User, Utensils, MapPin, ChevronDown } from "lucide-react";
+import { Search, Heart, Menu, User, MapPin, ChevronDown } from "lucide-react";
 
 export function Header() {
   return (
@@ -7,11 +7,17 @@ export function Header() {
       <div className="max-w-[1200px] mx-auto px-6 py-4 flex items-center justify-between gap-8">
         <div className="flex items-center gap-8">
           {/* Logo */}
+          {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <Utensils className="text-primary w-8 h-8" strokeWidth={2.5} />
+            {/* <Utensils className="text-primary w-8 h-8" strokeWidth={2.5} />
             <h1 className="text-primary text-2xl font-bold tracking-tight">
               Authentik
-            </h1>
+            </h1> */}
+            <img
+              src="/logo.png"
+              alt="Authentik"
+              className="h-8 w-auto object-contain"
+            />
           </Link>
 
           {/* City Switcher */}
@@ -23,7 +29,7 @@ export function Header() {
         </div>
 
         {/* Search Bar */}
-        <div className="flex-1 max-w-xl hidden md:block">
+        {/* <div className="flex-1 max-w-xl hidden md:block">
           <label className="relative flex items-center w-full">
             <Search className="absolute left-4 text-gray-400 w-5 h-5" />
             <input
@@ -32,10 +38,10 @@ export function Header() {
               type="text"
             />
           </label>
-        </div>
+        </div> */}
 
         {/* User Actions */}
-        <div className="flex items-center gap-4 shrink-0">
+        {/* <div className="flex items-center gap-4 shrink-0">
           <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <Heart className="w-6 h-6 text-gray-600" />
           </button>
@@ -45,7 +51,7 @@ export function Header() {
               <User className="w-5 h-5" />
             </div>
           </button>
-        </div>
+        </div> */}
       </div>
     </header>
   );

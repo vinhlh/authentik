@@ -119,24 +119,16 @@ async function handleBatch(pathArg: string | undefined) {
 
 function printUsage() {
   console.log('Usage:')
-  console.log('  npm run extract <video-url> [creator-name] [--dry]')
-  console.log('  npm run extract batch <batch-file.json> [--dry]')
-  console.log('  npm run extract help')
+  console.log('  npm run extract -- <video-url> [creator-name] [--dry]')
+  console.log('  npm run extract -- batch <batch-file.json> [--dry]')
+  console.log('  npm run extract -- help')
   console.log('')
   console.log('Options:')
-  console.log('  --dry, -d    Preview mode - show what would be imported without making changes')
+  console.log('  --dry, -d    Preview mode')
   console.log('')
   console.log('Examples:')
-  console.log('  npm run extract "https://youtube.com/watch?v=..." "Vinh Le"')
-  console.log('  npm run extract "https://youtube.com/watch?v=..." "Vinh Le" --dry')
-  console.log('  npm run extract batch videos.json')
-  console.log('  npm run extract batch videos.json --dry')
-  console.log('')
-  console.log('Batch file format (JSON):')
-  console.log('[')
-  console.log('  { "url": "https://youtube.com/...", "creatorName": "Food Vlogger" },')
-  console.log('  { "url": "https://tiktok.com/...", "creatorName": "Local Foodie" }')
-  console.log(']')
+  console.log('  npm run extract -- "https://youtube.com/..." "Vinh Le"')
+  console.log('  npm run extract -- batch videos.json')
 }
 
 main().catch(error => {

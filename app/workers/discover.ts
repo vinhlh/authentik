@@ -17,8 +17,18 @@ async function main() {
 
   console.log(`Searching for: "${query}"...`)
 
+
   try {
-    const candidates = await searchCandidates(query)
+    let candidates: any[] = []
+
+    if (query.includes('tiktok.com')) {
+      // It's a TikTok channel URL
+      const { discoverTikTokChannel } = await import('../lib/tiktok-discovery')
+      candidates = await discoverTikTokChannel(query)
+    } else {
+      // Standard YouTube search
+      candidates = await searchCandidates(query)
+    }
 
     console.log(`\nFound ${candidates.length} candidates:\n`)
 

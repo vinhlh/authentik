@@ -78,7 +78,35 @@ export async function extractFromVideo(
 
   console.log(`✅ Found ${restaurants.length} restaurant mentions`)
 
-  const collectionName = metadata?.title || `Collection from ${creatorName}`
+  // Refine collection name using AI (always enabled for text)
+  let collectionName = metadata?.title || `Collection from ${creatorName}`
+
+  if (metadata?.title) {
+    try {
+      const refinedName = await generateConciseCollectionName(metadata.title, creatorName)
+      if (refinedName) {
+        console.log(`✨ AI Refined Name: "${collectionName}" -> "${refinedName}"`)
+        collectionName = refinedName
+      }
+    } catch (e) {
+      console.warn('Failed to refine collection name with AI, using original.')
+    }
+  }
+
+  // Refine collection description using AI (new request)
+  let collectionDescription = metadata?.description || null
+
+  if (metadata?.description && metadata.description.length > 100) {
+    try {
+      const refinedDesc = await generateConciseDescription(metadata.description, creatorName)
+      if (refinedDesc) {
+        console.log(`✨ AI Refined Description: length ${metadata.description.length} -> ${refinedDesc.length}`)
+        collectionDescription = refinedDesc
+      }
+    } catch (e) {
+      console.warn('Failed to refine description with AI, using original.')
+    }
+  }
 
   // In dry mode, create a mock collection
   let collection: { id: string; name: string }
@@ -90,24 +118,53 @@ export async function extractFromVideo(
     }
     console.log(`📝 Would create collection: ${collection.name}`)
   } else {
-    // Create collection in database
-    const { data: dbCollection, error: collectionError } = await supabase
+    // Check if collection already exists by source_url
+    const { data: existingCollection } = await supabase
       .from('collections')
-      .insert({
-        name: collectionName,
-        description: metadata?.description || null,
-        creator_name: creatorName,
-        source_url: url,
-      })
-      .select()
+      .select('*')
+      .eq('source_url', url)
       .single()
 
-    if (collectionError || !dbCollection) {
-      throw new Error(`Failed to create collection: ${collectionError?.message}`)
-    }
+    if (existingCollection) {
+      console.log(`🔄 Found existing collection: ${existingCollection.name}`)
+      // Update existing
+      const { data: updated, error: updateError } = await supabase
+        .from('collections')
+        .update({
+          name: collectionName, // Update name if video title changed
+          description: collectionDescription,
+          creator_name: creatorName,
+          // Don't update source_url as it matched
+        })
+        .eq('id', existingCollection.id)
+        .select()
+        .single()
 
-    collection = dbCollection
-    console.log(`📝 Created collection: ${collection.name}`)
+      if (updateError || !updated) {
+        throw new Error(`Failed to update collection: ${updateError?.message}`)
+      }
+      collection = updated
+      console.log(`✅ Updated collection: ${collection.name}`)
+    } else {
+      // Create new collection
+      const { data: dbCollection, error: collectionError } = await supabase
+        .from('collections')
+        .insert({
+          name: collectionName,
+          description: collectionDescription,
+          creator_name: creatorName,
+          source_url: url,
+        })
+        .select()
+        .single()
+
+      if (collectionError || !dbCollection) {
+        throw new Error(`Failed to create collection: ${collectionError?.message}`)
+      }
+
+      collection = dbCollection
+      console.log(`📝 Created collection: ${collection.name}`)
+    }
   }
 
   // Process each restaurant mention
@@ -172,12 +229,8 @@ export async function extractFromVideo(
         const restaurantId = await importRestaurant(verified, mention)
 
         if (restaurantId) {
-          // Link to collection
-          await linkRestaurantToCollection(collection.id, restaurantId, mention)
-
-          // Download and enhance photos
-          const collectionSlug = createSlug(collection.name)
-          await processRestaurantPhotos(verified, collectionSlug, 3)
+          // Link to collection (upsert/handle duplicates)
+          await linkRestaurantToCollection(collection.id, restaurantId, mention, verified)
 
           stats.imported++
           results.push({ mention, verified, imported: true, restaurantId })
@@ -213,25 +266,13 @@ export async function extractFromVideo(
 }
 
 /**
- * Import restaurant to database
+ * Import restaurant to database (Upsert)
  */
 async function importRestaurant(
   placeDetails: PlaceDetails,
   _mention: RestaurantMention
 ): Promise<string | null> {
   try {
-    // Check if restaurant already exists
-    const { data: existing } = await supabase
-      .from('restaurants')
-      .select('id')
-      .eq('google_place_id', placeDetails.place_id)
-      .single()
-
-    if (existing) {
-      console.log(`   ℹ️  Restaurant already exists: ${placeDetails.name}`)
-      return existing.id
-    }
-
     // Classify restaurant
     const classification = classifyRestaurant(placeDetails)
     const authenticity = calculateAuthenticityWithSignals(placeDetails)
@@ -239,31 +280,63 @@ async function importRestaurant(
     // Extract cuisine types from Google types
     const cuisineTypes = extractCuisineTypes(placeDetails.types || [])
 
-    // Create restaurant record
-    const { data: restaurant, error } = await supabase
-      .from('restaurants')
-      .insert({
-        google_place_id: placeDetails.place_id,
-        name: placeDetails.name,
-        address: placeDetails.formatted_address,
-        location: placeDetails.geometry?.location
-          ? `POINT(${placeDetails.geometry.location.lng} ${placeDetails.geometry.location.lat})`
-          : null,
-        cuisine_type: cuisineTypes,
-        price_level: placeDetails.price_level || null,
-        classification,
-        authenticity_score: authenticity.score,
-      })
-      .select()
-      .single()
-
-    if (error || !restaurant) {
-      console.error(`   ❌ Failed to import: ${error?.message}`)
-      return null
+    // Prepare restaurant data
+    const restaurantData = {
+      google_place_id: placeDetails.place_id,
+      name: placeDetails.name,
+      address: placeDetails.formatted_address,
+      location: placeDetails.geometry?.location
+        ? `POINT(${placeDetails.geometry.location.lng} ${placeDetails.geometry.location.lat})`
+        : null,
+      cuisine_type: cuisineTypes,
+      price_level: placeDetails.price_level || null,
+      classification,
+      authenticity_score: authenticity.score,
+      phone_number: placeDetails.formatted_phone_number || null,
+      website: placeDetails.website || null,
+      opening_hours: placeDetails.opening_hours || null,
+      google_rating: placeDetails.rating || null,
+      google_user_ratings_total: placeDetails.user_ratings_total || null,
+      authenticity_details: authenticity,
     }
 
-    console.log(`   ✅ Imported: ${restaurant.name}`)
-    return restaurant.id
+    // Check if exists first (to decide update vs insert)
+    const { data: existing } = await supabase
+      .from('restaurants')
+      .select('id')
+      .eq('google_place_id', placeDetails.place_id)
+      .single()
+
+    let restaurantId: string
+
+    if (existing) {
+      console.log(`   🔄 Updating existing restaurant: ${placeDetails.name}`)
+      const { error: updateError } = await supabase
+        .from('restaurants')
+        .update(restaurantData)
+        .eq('id', existing.id)
+
+      if (updateError) {
+        console.error(`   ❌ Failed to update restaurant: ${updateError.message}`)
+        return null
+      }
+      restaurantId = existing.id
+    } else {
+      console.log(`   ✨ Creating new restaurant: ${placeDetails.name}`)
+      const { data: newRestaurant, error: insertError } = await supabase
+        .from('restaurants')
+        .insert(restaurantData)
+        .select('id')
+        .single()
+
+      if (insertError || !newRestaurant) {
+        console.error(`   ❌ Failed to insert restaurant: ${insertError?.message}`)
+        return null
+      }
+      restaurantId = newRestaurant.id
+    }
+
+    return restaurantId
   } catch (error) {
     console.error('Error importing restaurant:', error)
     return null
@@ -271,24 +344,38 @@ async function importRestaurant(
 }
 
 /**
- * Link restaurant to collection
+ * Link restaurant to collection (Handle duplicates)
  */
 async function linkRestaurantToCollection(
   collectionId: string,
   restaurantId: string,
-  mention: RestaurantMention
+  mention: RestaurantMention,
+  verified: PlaceDetails
 ): Promise<void> {
+  // Try to insert
   const { error } = await supabase
     .from('collection_restaurants')
     .insert({
       collection_id: collectionId,
       restaurant_id: restaurantId,
-      notes: mention.notes || null,
-      recommended_dishes: mention.dishes || null,
+      notes: mention.notes,
+      recommended_dishes: mention.dishes || null
     })
 
   if (error) {
-    console.error('Error linking restaurant to collection:', error)
+    if (error.code === '23505') { // Unique violation
+      console.log(`   🔗 Already linked to collection (Updating notes)`)
+      await supabase
+        .from('collection_restaurants')
+        .update({
+          notes: mention.notes,
+          recommended_dishes: mention.dishes || null
+        })
+        .eq('collection_id', collectionId)
+        .eq('restaurant_id', restaurantId)
+    } else {
+      console.error('Error linking restaurant to collection:', error)
+    }
   }
 }
 
@@ -423,3 +510,122 @@ export async function batchExtract(
   return results
 }
 
+
+/**
+ * Use AI to generate a concise, attractive collection name
+ */
+async function generateConciseCollectionName(
+  originalTitle: string,
+  creatorName: string
+): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai')
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }) // Available per list-models output
+
+    const prompt = `
+    Refine this video title into a concise, attractive collection name for a food discovery app.
+
+    Current Title: "${originalTitle}"
+    Creator: "${creatorName}"
+
+    Rules:
+    1. Remove episode numbers (e.g., #290, Vol. 1, Part 2).
+    2. Remove SEO keywords, clickbait phrases (e.g., "Must Try", "Shocking", "Too delicious").
+    3. Remove excessive punctuation or separators (e.g., " | ", " - ").
+    4. Focus on the core topic (Location + Food Type).
+    5. You MAY format it as "Food Topic inside Location with CreatorName" if it sounds natural in the original language (e.g., "Ẩm thực đường phố Đà Nẵng cùng Yêu Máy Bay").
+    6. Keep it in the ORIGINAL language (Vietnamese).
+    7. Return ONLY the new name, no quotes or explanations.
+    `
+
+    // Simple retry logic with linear backoff
+    let result
+    for (let i = 0; i < 3; i++) {
+      try {
+        result = await model.generateContent(prompt)
+        break
+      } catch (e: any) {
+        if (e.message?.includes('429') || e.status === 429) {
+          if (i === 2) throw e // Rethrow on last attempt
+          const waitTime = (i + 1) * 2000
+          console.log(`⏳ AI Rate limit hit.Retrying in ${waitTime / 1000}s...`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        } else {
+          throw e
+        }
+      }
+    }
+
+    if (!result) return null; // Should not trigger if throw works correctly
+    const response = await result.response
+    const text = response.text()?.trim().replace(/^["']|["']$/g, '') // Remove quotes
+
+    return text.length > 0 && text.length < originalTitle.length ? text : null
+  } catch (error) {
+    console.error('❌ FATAL: Error generating concise name:', error)
+    throw error // Exit script on failure as requested
+  }
+}
+
+/**
+ * Use AI to generate a concise, attractive collection description
+ * Removes social links, gear lists, and SEO fluff
+ */
+async function generateConciseDescription(
+  originalDescription: string,
+  creatorName: string
+): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai')
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
+    const prompt = `
+    Summarize this YouTube video description into a engaging, concise description for a food collection.
+
+    Creator: "${creatorName}"
+    Current Description:
+    "${originalDescription.substring(0, 5000)}" // Truncate to avoid token limits
+
+    Rules:
+    1. Remove all social media links, "Subscribe" requests, affiliate links, and gear lists.
+    2. Focus on the FOOD experience and the LOCATION. What is this collection about? (e.g., "A tour of the best Bánh Mì spots in Da Nang...").
+    3. Keep it to 2-3 engaging sentences.
+    4. Maintain the voice of the creator but make it cleaner.
+    5. Keep it in the ORIGINAL language (Vietnamese).
+    6. Return ONLY the new description.
+    `
+
+    // Simple retry logic
+    let result
+    for (let i = 0; i < 3; i++) {
+      try {
+        result = await model.generateContent(prompt)
+        break
+      } catch (e: any) {
+        if (e.message?.includes('429') || e.status === 429) {
+          if (i === 2) throw e
+          const waitTime = (i + 1) * 2000
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        } else {
+          throw e
+        }
+      }
+    }
+
+    if (!result) return null
+    const response = await result.response
+    return response.text()?.trim().replace(/^["']|["']$/g, '') || null
+
+  } catch (error) {
+    console.error('❌ FATAL: Error generating concise description:', error)
+    throw error // Exit script on failure as requested
+  }
+}

@@ -47,9 +47,9 @@ export function HeroCollections({ collections }: { collections?: HeroCollectionP
           View all <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
-      <div className="flex overflow-x-auto pb-4 gap-6 scrollbar-hide -mx-2 px-2">
+      <div className="masonry">
         {displayCollections.map((collection) => (
-          <div key={collection.id} className="flex-none w-[280px] group cursor-pointer">
+          <div key={collection.id} className="masonry-item break-inside-avoid mb-6 group cursor-pointer">
             <Link href={`/collections/${collection.id}`}>
               <div className="relative aspect-[4/5] rounded-xl overflow-hidden mb-3 bg-gray-100">
                 <img
@@ -57,13 +57,15 @@ export function HeroCollections({ collections }: { collections?: HeroCollectionP
                   src={getYouTubeThumbnail(collection.source_url)}
                   alt={collection.name}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                <div className="absolute bottom-4 left-4 text-white">
-                  <p className="text-xs uppercase tracking-widest font-bold opacity-80">
-                    {collection.restaurant_count || 0} Spots
-                  </p>
-                  <h3 className="text-xl font-bold line-clamp-2">{collection.name}</h3>
-                </div>
+                <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#1c1917] leading-tight mb-1 group-hover:text-primary transition-colors">
+                  {collection.name}
+                </h3>
+                <p className="text-sm font-medium text-gray-500">
+                  {collection.restaurant_count || 0} Spots
+                </p>
               </div>
             </Link>
           </div>

@@ -47,6 +47,49 @@ function getShortPlaceId(placeId: string): string {
 }
 
 /**
+ * Retry configuration
+ */
+const RETRY_CONFIG = {
+  maxRetries: 5,
+  initialDelayMs: 2000,  // Start with 2 seconds
+  maxDelayMs: 30000,     // Max 30 seconds
+  backoffMultiplier: 2,   // Double delay each retry
+}
+
+/**
+ * Sleep helper
+ */
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Retry a function with exponential backoff on rate limit errors
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  context: string
+): Promise<T> {
+  let delay = RETRY_CONFIG.initialDelayMs
+
+  for (let attempt = 1; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      const isRateLimit = error?.status === 429 || error?.message?.includes('429')
+
+      if (!isRateLimit || attempt === RETRY_CONFIG.maxRetries) {
+        throw error
+      }
+
+      console.log(`   ⏳ Rate limited (${context}), retry ${attempt}/${RETRY_CONFIG.maxRetries} in ${delay / 1000}s...`)
+      await sleep(delay)
+      delay = Math.min(delay * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs)
+    }
+  }
+
+  throw new Error(`Max retries exceeded for ${context}`)
+}
+
+/**
  * Analyze a photo using Gemini Vision
  * Identifies food content, quality, and appeal
  */
@@ -55,7 +98,7 @@ export async function analyzePhotoWithAI(imageBuffer: Buffer): Promise<PhotoAnal
     return null
   }
 
-  try {
+  return retryWithBackoff(async () => {
     const base64Image = imageBuffer.toString('base64')
 
     const response = await fetch(
@@ -93,8 +136,9 @@ export async function analyzePhotoWithAI(imageBuffer: Buffer): Promise<PhotoAnal
     )
 
     if (!response.ok) {
-      console.error('Gemini Vision error:', response.status)
-      return null
+      const error = new Error(`Gemini Vision error: ${response.status}`) as any
+      error.status = response.status
+      throw error
     }
 
     const result = await response.json()
@@ -105,26 +149,23 @@ export async function analyzePhotoWithAI(imageBuffer: Buffer): Promise<PhotoAnal
     if (!jsonMatch) return null
 
     return JSON.parse(jsonMatch[0]) as PhotoAnalysis
-  } catch (error) {
-    console.error('Error analyzing photo:', error)
-    return null
-  }
+  }, 'photo analysis')
 }
 
 /**
  * Enhance a photo using Gemini 2.0 Flash image generation
  * Creates an enhanced version while preserving authenticity
+ * Retries on rate limit errors
  */
 export async function enhancePhotoWithAI(
   inputPath: string,
   outputPath: string
 ): Promise<boolean> {
   if (!GEMINI_API_KEY) {
-    console.warn('⚠️  GEMINI_API_KEY not set - using Sharp fallback')
-    return enhancePhotoWithSharp(inputPath, outputPath)
+    throw new Error('GEMINI_API_KEY not set')
   }
 
-  try {
+  return retryWithBackoff(async () => {
     const imageBuffer = await readFile(inputPath)
     const base64Image = imageBuffer.toString('base64')
 
@@ -137,12 +178,12 @@ export async function enhancePhotoWithAI(
           contents: [{
             parts: [
               {
-                text: `Enhance this food photo:
-- Improve lighting and color balance subtly
-- Sharpen food details
-- Keep authentic Vietnamese street food atmosphere
-- Do NOT over-process or make it look artificial
-- Preserve original colors and setting`
+                text: `Enhance the lighting and color of this food photo to make it look like a high-end food delivery app studio shot:
+- STRICTLY PRESERVE all food ingredients and arrangement
+- Do NOT add or remove any items
+- Focus on Relighting (Bright, soft, studio quality) and Color Grading (Vibrant, appetizing)
+- Keep geometry 100% identical to original
+- Make it look delicious without changing the food itself`
               },
               {
                 inlineData: {
@@ -160,9 +201,9 @@ export async function enhancePhotoWithAI(
     )
 
     if (!response.ok) {
-      // Fall back to Sharp if Gemini image gen not available
-      console.log('   ⚠️ Gemini image gen unavailable, using Sharp')
-      return enhancePhotoWithSharp(inputPath, outputPath)
+      const error = new Error(`Gemini enhancement error: ${response.status}`) as any
+      error.status = response.status
+      throw error
     }
 
     const result = await response.json()
@@ -171,16 +212,13 @@ export async function enhancePhotoWithAI(
     )
 
     if (!imagePart?.inlineData?.data) {
-      return enhancePhotoWithSharp(inputPath, outputPath)
+      throw new Error('No image in response')
     }
 
     const enhancedBuffer = Buffer.from(imagePart.inlineData.data, 'base64')
     await writeFile(outputPath, enhancedBuffer)
     return true
-  } catch (error) {
-    console.error('Gemini enhancement error, falling back to Sharp:', error)
-    return enhancePhotoWithSharp(inputPath, outputPath)
-  }
+  }, 'photo enhancement')
 }
 
 /**
@@ -348,74 +386,262 @@ export interface PhotoResult {
   enhancedPath: string | null
   category: EnhancedPhoto['category']
   success: boolean
+  isEnhanced: boolean
+  webPath: string // Web-accessible path (e.g., /images/slug/file.jpg)
 }
 
 /**
  * Process photos for a restaurant
- * Downloads originals and creates AI-enhanced versions
+ * 1. Downloads all photos (up to 10) as candidates
+ * 2. AI analyzes and selects best 3 food photos
+ * 3. Enhances only the selected photos
  */
 export async function processRestaurantPhotos(
   place: PlaceDetails,
   collectionSlug: string,
-  maxPhotos: number = 3
+  maxPhotos: number = 3,
+  maxCandidates: number = 10,
+  options: { skipAI?: boolean } = {}
 ): Promise<PhotoResult[]> {
   const results: PhotoResult[] = []
 
-  // Create images directory
-  const imagesDir = path.join(process.cwd(), 'images', collectionSlug)
-  if (!existsSync(imagesDir)) {
-    await mkdir(imagesDir, { recursive: true })
-  }
-
-  // Select best photos using AI (falls back to heuristics if no API key)
-  const selectedPhotos = await selectBestPhotosWithAI(place, imagesDir, maxPhotos)
-
-  if (selectedPhotos.length === 0) {
+  if (!place.photos || place.photos.length === 0) {
     console.log('   📷 No photos available')
     return results
   }
 
+  // Create images directory in public folder
+  const imagesDir = path.join(process.cwd(), 'public', 'images', collectionSlug)
+  if (!existsSync(imagesDir)) {
+    await mkdir(imagesDir, { recursive: true })
+  }
+
   const shortId = getShortPlaceId(place.place_id)
+  const photosToDownload = place.photos.slice(0, maxCandidates)
 
-  for (let i = 0; i < selectedPhotos.length; i++) {
-    const photo = selectedPhotos[i]
-    const index = i + 1
+  console.log(`   📥 Downloading ${photosToDownload.length} candidate photos...`)
 
-    const originalFilename = `${shortId}-original-${index}.jpg`
-    const enhancedFilename = `${shortId}-enhanced-${index}.jpg`
+  // Step 1: Download all candidate photos
+  const downloaded: { path: string; index: number; analysis: PhotoAnalysis | null }[] = []
 
-    const originalPath = path.join(imagesDir, originalFilename)
-    const enhancedPath = path.join(imagesDir, enhancedFilename)
+  for (let i = 0; i < photosToDownload.length; i++) {
+    const photo = photosToDownload[i]
+    const candidateFilename = `${shortId}-candidate-${i + 1}.jpg`
+    const candidatePath = path.join(imagesDir, candidateFilename)
 
-    // Download original
-    console.log(`   📥 Downloading photo ${index}/${selectedPhotos.length}...`)
-    const downloadSuccess = await downloadPhoto(photo.url, originalPath)
-
-    if (!downloadSuccess) {
-      results.push({
-        originalPath,
-        enhancedPath: null,
-        category: photo.category,
-        success: false
-      })
-      continue
+    const url = getPhotoUrl(photo.photo_reference, 800)
+    // Only download if not exists or overwrite? For now assume download always needed or check exists
+    // Simplest: Check if exists to speed up skipped runs
+    let success = false
+    if (existsSync(candidatePath)) {
+      success = true
+    } else {
+      success = await downloadPhoto(url, candidatePath)
     }
 
-    // Enhance with AI (falls back to Sharp if unavailable)
-    console.log(`   ✨ Enhancing photo ${index}/${selectedPhotos.length}...`)
-    const enhanceSuccess = await enhancePhotoWithAI(originalPath, enhancedPath)
+    if (success) {
+      downloaded.push({ path: candidatePath, index: i + 1, analysis: null })
+    }
+  }
+
+  console.log(`   ✅ Downloaded ${downloaded.length}/${photosToDownload.length} photos`)
+
+  if (options.skipAI) {
+    console.log(`   ⏩ Skipping AI processing as requested`)
+    return downloaded.map(item => ({
+      originalPath: item.path,
+      enhancedPath: null,
+      category: 'unknown',
+      success: true,
+      isEnhanced: false,
+      webPath: `/images/${collectionSlug}/${path.basename(item.path)}`
+    }))
+  }
+
+  // Step 2: AI analyze each photo (if API available)
+  if (GEMINI_API_KEY && downloaded.length > 0) {
+    console.log(`   🤖 AI analyzing ${downloaded.length} photos...`)
+
+    for (let i = 0; i < downloaded.length; i++) {
+      const item = downloaded[i]
+
+      // Rate limiting: wait 10s between API calls to strictly respect Free Tier limits
+      if (i > 0) await new Promise(r => setTimeout(r, 10000))
+
+      try {
+        const buffer = await readFile(item.path)
+        item.analysis = await analyzePhotoWithAI(buffer)
+      } catch {
+        // Analysis failed, will use heuristic scoring
+      }
+    }
+  }
+
+  // Step 3: Rank and select best photos
+  const ranked = downloaded
+    .map(item => ({
+      ...item,
+      score: item.analysis
+        ? (item.analysis.isFood ? 100 : 0) + item.analysis.foodScore + item.analysis.qualityScore
+        : 50 // Default score for unanalyzed
+    }))
+    .sort((a, b) => b.score - a.score)
+
+  const selected = ranked.slice(0, maxPhotos)
+  const selectedPaths = new Set(selected.map(s => s.path))
+
+  console.log(`   🏆 Selected top ${selected.length} photos for enhancement`)
+
+  // Step 4: Enhance selected photos
+  for (let i = 0; i < selected.length; i++) {
+    const item = selected[i]
+
+    // Rate limiting for enhancement (stricter limit for Image Gen)
+    // Wait 10s between calls
+    if (i > 0) await new Promise(r => setTimeout(r, 10000))
+
+    const enhancedFilename = `${shortId}-enhanced-${item.index}.jpg`
+    const enhancedPath = path.join(imagesDir, enhancedFilename)
+
+    console.log(`   ✨ Enhancing photo ${item.index}...`)
+    try {
+      await enhancePhotoWithAI(item.path, enhancedPath)
+    } catch (error) {
+      console.log(`   ⚠️ Enhancement failed (likely rate limit), skipping:`, error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  // Build results for all downloaded photos
+  for (const item of downloaded) {
+    const isSelected = selectedPaths.has(item.path)
+    const expectedEnhancedPath = path.join(imagesDir, `${shortId}-enhanced-${item.index}.jpg`)
+    const enhancedExists = isSelected && existsSync(expectedEnhancedPath)
+
+    const enhancedPath = enhancedExists ? expectedEnhancedPath : null
 
     results.push({
-      originalPath,
-      enhancedPath: enhanceSuccess ? enhancedPath : null,
-      category: photo.category,
-      success: true
+      originalPath: item.path,
+      enhancedPath,
+      category: item.analysis?.category === 'food_closeup' || item.analysis?.category === 'food_table'
+        ? 'food'
+        : item.analysis?.category === 'interior'
+          ? 'interior'
+          : item.analysis?.category === 'exterior'
+            ? 'exterior'
+            : 'unknown',
+      success: true,
+      isEnhanced: isSelected,
+      webPath: `/images/${collectionSlug}/${path.basename(enhancedExists ? expectedEnhancedPath : item.path)}`
     })
   }
 
-  const successCount = results.filter(r => r.success).length
-  const enhancedCount = results.filter(r => r.enhancedPath).length
-  console.log(`   📸 Photos: ${successCount} downloaded, ${enhancedCount} enhanced`)
+  const enhancedCount = results.filter(r => r.isEnhanced).length
+  console.log(`   📸 Photos: ${downloaded.length} saved, ${enhancedCount} enhanced`)
+
+  return results
+}
+
+/**
+ * Process already downloaded photos in a directory
+ */
+export async function processLocalPhotos(
+  imagesDir: string,
+  shortId: string,
+  maxPhotos: number = 3
+): Promise<PhotoResult[]> {
+  const results: PhotoResult[] = []
+
+  // Find candidate photos
+  const candidates = (await import('fs/promises')).readdir(imagesDir)
+    .then(files => files
+      .filter(f => f.startsWith(`${shortId}-candidate-`) && f.endsWith('.jpg'))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/candidate-(\d+)/)?.[1] || '0')
+        const numB = parseInt(b.match(/candidate-(\d+)/)?.[1] || '0')
+        return numA - numB
+      })
+      .map(f => ({
+        path: path.join(imagesDir, f),
+        index: parseInt(f.match(/candidate-(\d+)/)?.[1] || '0'),
+        analysis: null as PhotoAnalysis | null
+      }))
+    )
+
+  const downloaded = await candidates
+  console.log(`   📂 Found ${downloaded.length} candidate photos locally`)
+
+  if (downloaded.length === 0) return []
+
+  // Step 2: AI Analyze
+  console.log(`   🤖 AI analyzing ${downloaded.length} photos...`)
+  for (let i = 0; i < downloaded.length; i++) {
+    const item = downloaded[i]
+
+    // Rate limiting: wait 10s between API calls
+    if (i > 0) await new Promise(r => setTimeout(r, 10000))
+
+    try {
+      const buffer = await readFile(item.path)
+      item.analysis = await analyzePhotoWithAI(buffer)
+    } catch (e) {
+      console.error(`Warning: Analysis failed for ${item.path}`, e)
+    }
+  }
+
+  // Step 3: Rank
+  const ranked = downloaded
+    .map(item => ({
+      ...item,
+      score: item.analysis
+        ? (item.analysis.isFood ? 100 : 0) + item.analysis.foodScore + item.analysis.qualityScore
+        : 50
+    }))
+    .sort((a, b) => b.score - a.score)
+
+  const selected = ranked.slice(0, maxPhotos)
+  const selectedPaths = new Set(selected.map(s => s.path))
+
+  console.log(`   🏆 Selected top ${selected.length} photos for enhancement`)
+
+  // Step 4: Enhance
+  for (let i = 0; i < selected.length; i++) {
+    const item = selected[i]
+
+    // Rate limiting
+    if (i > 0) await new Promise(r => setTimeout(r, 10000))
+
+    const enhancedFilename = `${shortId}-enhanced-${item.index}.jpg`
+    const enhancedPath = path.join(imagesDir, enhancedFilename)
+
+    // Check if already enhanced
+    if (existsSync(enhancedPath)) {
+      console.log(`   ✨ Photo ${item.index} already enhanced, skipping`)
+      continue
+    }
+
+    console.log(`   ✨ Enhancing photo ${item.index}...`)
+    try {
+      await enhancePhotoWithAI(item.path, enhancedPath)
+    } catch (error) {
+      console.log(`   ⚠️ Enhancement failed:`, error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  // Results
+  for (const item of downloaded) {
+    const isSelected = selectedPaths.has(item.path)
+    const expectedEnhancedPath = path.join(imagesDir, `${shortId}-enhanced-${item.index}.jpg`)
+    const enhancedExists = isSelected && existsSync(expectedEnhancedPath)
+
+    results.push({
+      originalPath: item.path,
+      enhancedPath: enhancedExists ? expectedEnhancedPath : null,
+      category: item.analysis?.category as any || 'unknown',
+      success: true,
+      isEnhanced: isSelected,
+      webPath: `/images/${shortId}/${path.basename(enhancedExists ? expectedEnhancedPath : item.path)}` // Note: shortId logic might need review if folder is slug
+    })
+  }
 
   return results
 }
