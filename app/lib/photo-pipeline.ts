@@ -457,7 +457,7 @@ export async function processRestaurantPhotos(
   collectionSlug: string,
   maxPhotos: number = 3,
   maxCandidates: number = 10,
-  options: { skipAI?: boolean } = {}
+  options: { skipAnalysis?: boolean; skipEnhancement?: boolean } = {}
 ): Promise<PhotoResult[]> {
   const results: PhotoResult[] = []
 
@@ -500,34 +500,8 @@ export async function processRestaurantPhotos(
 
   console.log(`   ✅ Downloaded ${downloaded.length}/${photosToDownload.length} photos`)
 
-  if (options.skipAI) {
-    console.log(`   ⏩ Skipping AI, uploading top ${maxPhotos} to Storage...`)
-
-    // Upload the first N photos to Supabase Storage
-    const toUpload = downloaded.slice(0, maxPhotos)
-
-    for (const item of toUpload) {
-      const storagePath = `${collectionSlug}/${shortId}-${item.index}.jpg`
-      const publicUrl = await uploadToStorage(item.path, storagePath)
-
-      if (publicUrl) {
-        console.log(`   ☁️  Uploaded: ${storagePath}`)
-        results.push({
-          originalPath: item.path,
-          enhancedPath: null,
-          category: 'unknown',
-          success: true,
-          isEnhanced: false,
-          webPath: publicUrl
-        })
-      }
-    }
-
-    return results
-  }
-
-  // Step 2: AI analyze each photo (if API available)
-  if (GEMINI_API_KEY && downloaded.length > 0) {
+  // Step 2: AI analyze each photo (if API available and not skipped)
+  if (!options.skipAnalysis && GEMINI_API_KEY && downloaded.length > 0) {
     console.log(`   🤖 AI analyzing ${downloaded.length} photos...`)
 
     for (let i = 0; i < downloaded.length; i++) {
@@ -543,6 +517,8 @@ export async function processRestaurantPhotos(
         // Analysis failed, will use heuristic scoring
       }
     }
+  } else if (options.skipAnalysis) {
+    console.log(`   ⏩ Skipping AI analysis as requested`)
   }
 
   // Step 3: Rank and select best photos
@@ -558,62 +534,66 @@ export async function processRestaurantPhotos(
   const selected = ranked.slice(0, maxPhotos)
   const selectedPaths = new Set(selected.map(s => s.path))
 
-  console.log(`   🏆 Selected top ${selected.length} photos for enhancement`)
+  console.log(`   🏆 Selected top ${selected.length} photos for processing`)
 
-  // Step 4: Enhance selected photos and upload to Storage
+  // Step 4: Enhance (or upload original) selected photos
   for (let i = 0; i < selected.length; i++) {
     const item = selected[i]
 
-    // Rate limiting for enhancement (stricter limit for Image Gen)
-    // Wait 10s between calls
-    if (i > 0) await new Promise(r => setTimeout(r, 10000))
+    let enhancedPath: string | null = null
+    let isEnhanced = false
+    let finalStoragePath = ''
+    let publicUrl: string | null = null
 
-    const enhancedFilename = `${shortId}-enhanced-${item.index}.jpg`
-    const enhancedPath = path.join(tempDir, enhancedFilename)
+    // Enhance if requested and not skipped
+    if (!options.skipEnhancement) {
+      // Rate limiting for enhancement (stricter limit for Image Gen)
+      if (i > 0) await new Promise(r => setTimeout(r, 10000))
 
-    console.log(`   ✨ Enhancing photo ${item.index}...`)
-    try {
-      await enhancePhotoWithAI(item.path, enhancedPath)
+      const enhancedFilename = `${shortId}-enhanced-${item.index}.jpg`
+      const targetEnhancedPath = path.join(tempDir, enhancedFilename)
+      finalStoragePath = `${collectionSlug}/${enhancedFilename}`
 
-      // Upload enhanced photo to Storage
-      const storagePath = `${collectionSlug}/${enhancedFilename}`
-      const publicUrl = await uploadToStorage(enhancedPath, storagePath)
+      console.log(`   ✨ Enhancing photo ${item.index}...`)
+      try {
+        await enhancePhotoWithAI(item.path, targetEnhancedPath)
+        enhancedPath = targetEnhancedPath
+        isEnhanced = true
 
-      if (publicUrl) {
-        console.log(`   ☁️  Uploaded enhanced: ${storagePath}`)
-        results.push({
-          originalPath: item.path,
-          enhancedPath,
-          category: item.analysis?.category === 'food_closeup' || item.analysis?.category === 'food_table'
-            ? 'food'
-            : item.analysis?.category === 'interior'
-              ? 'interior'
-              : item.analysis?.category === 'exterior'
-                ? 'exterior'
-                : 'unknown',
-          success: true,
-          isEnhanced: true,
-          webPath: publicUrl
-        })
+        // Upload enhanced
+        publicUrl = await uploadToStorage(enhancedPath, finalStoragePath)
+        if (publicUrl) console.log(`   ☁️  Uploaded enhanced: ${finalStoragePath}`)
+      } catch (error) {
+        console.log(`   ⚠️ Enhancement failed, using original:`, error instanceof Error ? error.message : String(error))
       }
-    } catch (error) {
-      console.log(`   ⚠️ Enhancement failed, uploading original:`, error instanceof Error ? error.message : String(error))
+    } else {
+      console.log(`   ⏩ Skipping enhancement for photo ${item.index}`)
+    }
 
-      // Upload original as fallback
-      const storagePath = `${collectionSlug}/${shortId}-${item.index}.jpg`
-      const publicUrl = await uploadToStorage(item.path, storagePath)
+    // Fallback logic: If enhancement skipped or failed, upload original
+    if (!publicUrl) {
+      const originalFilename = `${shortId}-${item.index}.jpg`
+      finalStoragePath = `${collectionSlug}/${originalFilename}`
 
-      if (publicUrl) {
-        console.log(`   ☁️  Uploaded original: ${storagePath}`)
-        results.push({
-          originalPath: item.path,
-          enhancedPath: null,
-          category: 'unknown',
-          success: true,
-          isEnhanced: false,
-          webPath: publicUrl
-        })
-      }
+      publicUrl = await uploadToStorage(item.path, finalStoragePath)
+      if (publicUrl) console.log(`   ☁️  Uploaded original: ${finalStoragePath}`)
+    }
+
+    if (publicUrl) {
+      results.push({
+        originalPath: item.path,
+        enhancedPath,
+        category: item.analysis?.category === 'food_closeup' || item.analysis?.category === 'food_table'
+          ? 'food'
+          : item.analysis?.category === 'interior'
+            ? 'interior'
+            : item.analysis?.category === 'exterior'
+              ? 'exterior'
+              : 'unknown',
+        success: true,
+        isEnhanced,
+        webPath: publicUrl
+      })
     }
   }
 

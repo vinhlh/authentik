@@ -607,10 +607,12 @@ ${listings}
     - SPECIAL: Do NOT use generic creator names like "Authentik" as a person's name.
 
     Rules for Reviews:
+    - CONCISE & KEYWORD-DRIVEN: Use short phrases or keywords, easy to scan.
+    - DO NOT start with the restaurant name (e.g. "Bún bò Bà Già thu hút..." -> "Hương vị truyền thống, nước dùng thơm ngon").
     - Focus on FOOD/ATMOSPHERE.
     - NO timestamps, NO "check video", NO meta-references.
     - If no opinion, describe the dish neutrally.
-    - Keep it under 20 words.
+    - Keep it under 15 words.
     - VI summary must be in VIETNAMESE.
     - BANNED WORDS: Do NOT use "hấp dẫn", "ngon", "tuyệt vời", "đậm đà" universally. Use specific sensory words (e.g. "giòn rụm", "thanh ngọt", "béo ngậy", "thơm nức").
     - VARIETY: Ensure each review uses DIFFERENT adjectives.

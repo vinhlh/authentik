@@ -4,7 +4,53 @@ import { Restaurant } from "@/components/stitch/restaurant-card";
 import { parseWkbPoint } from "@/lib/utils/wkb-parser";
 import Link from "next/link";
 
+import type { Metadata } from "next";
+
 export const revalidate = 60;
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+
+  // Fetch collection
+  const { data: collection } = await supabase
+    .from('collections')
+    .select('name, name_vi, name_en, description, description_vi, description_en, source_url')
+    .eq('id', id)
+    .single();
+
+  if (!collection && id !== "1") {
+    return {
+      title: "Collection Not Found | Authentik",
+    }
+  }
+
+  // Use mock data if mocked
+  const name = collection?.name_en || collection?.name || (id === "1" ? "Best Bánh Mì in Da Nang" : "Authentik Collection");
+  const description = collection?.description_en || collection?.description || (id === "1" ? "A curated tour of the crispiest, most flavorful Bánh Mì spots in the city." : "Discover authentic food in Da Nang.");
+
+  // Extract video ID for cover image
+  const videoId = collection?.source_url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1] || (id === "1" ? "dQw4w9WgXcQ" : null);
+  const ogImage = videoId
+    ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+    : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000";
+
+  return {
+    title: `${name} | Authentik`,
+    description,
+    openGraph: {
+      title: name,
+      description,
+      images: [ogImage],
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: name,
+      description,
+      images: [ogImage],
+    }
+  }
+}
 
 export default async function CollectionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

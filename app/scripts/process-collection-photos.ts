@@ -30,7 +30,8 @@ const CONFIG = {
   maxCandidatesPerRestaurant: 10,
   delayBetweenRestaurantsMs: 3000,  // 3 seconds between restaurants
   delayBetweenCollectionsMs: 5000, // 5 seconds between collections
-  skipAI: true,
+  skipAnalysis: false,     // ALWAYS analyze to prioritize food
+  skipEnhancement: true,   // Skip enhancement for speed/cost, can enable if needed
 };
 
 interface RestaurantToProcess {
@@ -141,7 +142,10 @@ async function processBatch(restaurants: RestaurantToProcess[]) {
         restaurant.collectionSlug,
         CONFIG.maxPhotosPerRestaurant,
         CONFIG.maxCandidatesPerRestaurant,
-        { skipAI: CONFIG.skipAI }
+        {
+          skipAnalysis: CONFIG.skipAnalysis,
+          skipEnhancement: CONFIG.skipEnhancement
+        }
       );
 
       if (results.length > 0) {

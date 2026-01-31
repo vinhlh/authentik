@@ -10,11 +10,50 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Authentik - Discover Authentic Da Nang Food",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://authentik.app'),
+  title: {
+    default: "Authentik - Discover Authentic Da Nang Food",
+    template: "%s | Authentik"
+  },
   description: "Discover where Da Nang locals actually eat. Curated restaurant collections filtering out fake reviews and tourist traps.",
-  keywords: ["Da Nang", "food", "restaurants", "authentic", "local", "Vietnam"],
+  keywords: ["Da Nang", "food", "restaurants", "authentic", "local", "Vietnam", "travel", "cuisine"],
+  authors: [{ name: "Authentik Team" }],
+  creator: "Authentik",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "/",
+    title: "Authentik - Real Local Food",
+    description: "No tourist traps. Just authentic local favorites in Da Nang.",
+    siteName: "Authentik",
+    images: [{
+      url: "/og-image.jpg", // Needs to be added to public/
+      width: 1200,
+      height: 630,
+      alt: "Authentik Discovery"
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Authentik - Real Local Food",
+    description: "Discover authentic local food in Da Nang.",
+    creator: "@authentik",
+    images: ["/og-image.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
+import { Providers } from "./providers";
 import { LanguageProvider } from "@/lib/i18n-context";
 
 export default function RootLayout({
@@ -26,11 +65,13 @@ export default function RootLayout({
     <html lang="en" className="light">
       <body className={`${inter.variable} font-sans antialiased bg-[#fafaf9] text-[#1c1917] min-h-screen`}>
         <LanguageProvider>
-          <div className="layout-container flex flex-col">
-            <Header />
-            {children}
-            <Footer />
-          </div>
+          <Providers>
+            <div className="layout-container flex flex-col">
+              <Header />
+              {children}
+              <Footer />
+            </div>
+          </Providers>
         </LanguageProvider>
       </body>
     </html>
