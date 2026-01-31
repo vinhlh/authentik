@@ -15,7 +15,12 @@ const execAsync = util.promisify(exec)
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+// @ts-ignore
+const { GEMINI_CONFIG } = require('../ai/config');
+const model = genAI.getGenerativeModel({
+  model: GEMINI_CONFIG.modelName,
+  generationConfig: GEMINI_CONFIG.generationConfig
+})
 
 /**
  * TikTok Metadata structure
@@ -132,7 +137,7 @@ async function extractWithGemini(
       "address": "Address or location description",
       "dishes": ["dish 1", "dish 2"],
       "priceRange": "Cheap ($) or Moderate ($$) or Expensive ($$$)",
-      "description": "Brief summary of the review"
+      "description": "Detailed summary of the review, including atmosphere and specific food feedback"
     }
   ]
   If no restaurants found, return []

@@ -1,7 +1,7 @@
 "use client";
 
-import { Star, Navigation } from "lucide-react";
 import Link from "next/link";
+import { ArrowRight, Utensils, Quote, Star, Navigation } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { calculateDistance } from "@/lib/utils/distance";
 
@@ -33,7 +33,8 @@ export function RestaurantCard({
   userLocation,
   isHovered,
   onMouseEnter,
-  onMouseLeave
+  onMouseLeave,
+  collectionId
 }: {
   restaurant: Restaurant;
   index?: number;
@@ -41,6 +42,7 @@ export function RestaurantCard({
   isHovered?: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  collectionId?: string;
 }) {
   const { language, t } = useLanguage();
 
@@ -62,7 +64,7 @@ export function RestaurantCard({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <Link href={`/restaurants/${restaurant.id}`}>
+      <Link href={`/restaurants/${restaurant.id}${collectionId ? `?collectionId=${collectionId}` : ''}`}>
         <div className={`bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-pointer ${isHovered ? 'ring-2 ring-primary scale-[1.02]' : ''}`}>
           <div className="relative">
             <img
@@ -98,9 +100,10 @@ export function RestaurantCard({
               {restaurant.location} • {restaurant.cuisine}
             </p>
             {displayedSummary && (
-              <div className="mb-3 bg-primary-light/10 p-2.5 rounded-lg border border-primary-light/20">
-                <p className="text-sm text-gray-700 italic leading-relaxed">
-                  "{displayedSummary}"
+              <div className="mb-3 relative pl-2">
+                <Quote className="absolute -top-1 left-0 w-3 h-3 text-primary/40 rotate-180" />
+                <p className="text-sm text-gray-600 italic leading-relaxed font-serif pl-4">
+                  {displayedSummary}
                 </p>
               </div>
             )}

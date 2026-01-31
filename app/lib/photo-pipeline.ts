@@ -1,3 +1,5 @@
+import { GEMINI_CONFIG } from './ai/config'
+
 /**
  * Photo Download & AI Enhancement Pipeline
  * Downloads highlight food photos and enhances them using Gemini AI
@@ -8,13 +10,13 @@ import { mkdir, writeFile, readFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import os from 'os'
+import { createHash } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
-import { PlaceDetails, selectBestPhotos, getPhotoUrl, EnhancedPhoto } from './api/google-places'
+import { PlaceDetails, selectBestPhotos, getPhotoUrl, EnhancedPhoto, calculatePhotoScore } from './api/google-places'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-// Supabase Storage configuration
 // Supabase Storage configuration
 const STORAGE_BUCKET = 'Authentik Images'
 
@@ -64,6 +66,48 @@ async function uploadToStorage(
   } catch (err) {
     console.error(`   ❌ Upload error:`, err)
     return null
+  }
+}
+
+/**
+ * Cleanup old photos for a restaurant from Supabase Storage
+ */
+export async function cleanupOldPhotos(
+  collectionSlug: string,
+  shortPlaceId: string
+): Promise<void> {
+  const supabase = getSupabaseClient()
+  const storagePath = `${collectionSlug}`
+
+  try {
+    // List files in the collection folder
+    const { data: files, error: listError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .list(storagePath, {
+        limit: 100,
+        search: shortPlaceId // Filter by place ID
+      })
+
+    if (listError) {
+      console.error(`   ⚠️ Failed to list files for cleanup: ${listError.message}`)
+      return
+    }
+
+    if (!files || files.length === 0) return
+
+    // Delete found files
+    const filesToDelete = files.map(f => `${storagePath}/${f.name}`)
+    const { error: deleteError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .remove(filesToDelete)
+
+    if (deleteError) {
+      console.error(`   ⚠️ Failed to delete old photos: ${deleteError.message}`)
+    } else {
+      console.log(`   🧹 Cleaned up ${files.length} old photos`)
+    }
+  } catch (err) {
+    console.error(`   ⚠️ Cleanup error:`, err)
   }
 }
 
@@ -150,6 +194,8 @@ async function retryWithBackoff<T>(
  * Identifies food content, quality, and appeal
  */
 export async function analyzePhotoWithAI(imageBuffer: Buffer): Promise<PhotoAnalysis | null> {
+  const { GEMINI_CONFIG } = await import('./ai/config')
+
   if (!GEMINI_API_KEY) {
     return null
   }
@@ -158,7 +204,7 @@ export async function analyzePhotoWithAI(imageBuffer: Buffer): Promise<PhotoAnal
     const base64Image = imageBuffer.toString('base64')
 
     const response = await fetch(
-      `${GEMINI_API_URL}/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `${GEMINI_API_URL}/${GEMINI_CONFIG.modelName}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -217,6 +263,8 @@ export async function enhancePhotoWithAI(
   inputPath: string,
   outputPath: string
 ): Promise<boolean> {
+  const { GEMINI_CONFIG } = await import('./ai/config')
+
   if (!GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY not set')
   }
@@ -226,7 +274,7 @@ export async function enhancePhotoWithAI(
     const base64Image = imageBuffer.toString('base64')
 
     const response = await fetch(
-      `${GEMINI_API_URL}/gemini-2.0-flash-exp-image-generation:generateContent?key=${GEMINI_API_KEY}`,
+      `${GEMINI_API_URL}/${GEMINI_CONFIG.imageModelName}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -473,7 +521,19 @@ export async function processRestaurantPhotos(
   }
 
   const shortId = getShortPlaceId(place.place_id)
-  const photosToDownload = place.photos.slice(0, maxCandidates)
+
+  // Clean up old photos first to ensure we don't have mixed content
+  console.log(`   🧹 Cleaning up old photos...`)
+  await cleanupOldPhotos(collectionSlug, shortId)
+
+  // Sort photos by score to prioritize food photos
+  const sortedPhotos = [...place.photos].sort((a, b) => {
+    const scoreA = calculatePhotoScore(a).score
+    const scoreB = calculatePhotoScore(b).score
+    return scoreB - scoreA
+  })
+
+  const photosToDownload = sortedPhotos.slice(0, maxCandidates)
 
   console.log(`   📥 Downloading ${photosToDownload.length} candidate photos...`)
 
@@ -482,7 +542,11 @@ export async function processRestaurantPhotos(
 
   for (let i = 0; i < photosToDownload.length; i++) {
     const photo = photosToDownload[i]
-    const candidateFilename = `${shortId}-${i + 1}.jpg`
+
+    // Use a hash of the photo reference for the filename to avoid collisions/stale cache
+    // when sort order changes
+    const photoHash = createHash('md5').update(photo.photo_reference).digest('hex').slice(0, 8)
+    const candidateFilename = `${shortId}-${photoHash}.jpg`
     const candidatePath = path.join(tempDir, candidateFilename)
 
     const url = getPhotoUrl(photo.photo_reference, 800)
@@ -494,7 +558,7 @@ export async function processRestaurantPhotos(
     }
 
     if (success) {
-      downloaded.push({ path: candidatePath, index: i + 1, analysis: null })
+      downloaded.push({ path: candidatePath, index: i, analysis: null })
     }
   }
 

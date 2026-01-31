@@ -120,12 +120,34 @@ export async function extractFromVideo(
     if (nameEn) console.log(`   (EN): ${nameEn}`)
     if (descriptionEn) console.log(`   (EN Desc): ${descriptionEn?.substring(0, 50)}...`)
   } else {
-    // Check if collection already exists by source_url
-    const { data: existingCollection } = await supabase
-      .from('collections')
-      .select('*')
-      .eq('source_url', url)
-      .single()
+    // Check if collection already exists by source_url OR video ID search
+    // We normalize by searching for the video ID to handle different URL formats
+    let existingCollection: any = null
+
+    if (platform === 'youtube') {
+      const { extractVideoId } = await import('./parsers/youtube')
+      const videoId = extractVideoId(url)
+
+      if (videoId) {
+        // Search for any source_url that contains this video ID
+        const { data } = await supabase
+          .from('collections')
+          .select('*')
+          .ilike('source_url', `%${videoId}%`)
+          .single()
+        existingCollection = data
+      }
+    }
+
+    // Fallback to exact match if no ID found or not YouTube
+    if (!existingCollection) {
+      const { data } = await supabase
+        .from('collections')
+        .select('*')
+        .eq('source_url', url)
+        .single()
+      existingCollection = data
+    }
 
     if (existingCollection) {
       console.log(`🔄 Found existing collection: ${existingCollection.name_vi || existingCollection.name}`)
@@ -575,7 +597,11 @@ async function generateUnifiedExtraction(
   try {
     const { GoogleGenerativeAI } = await import('@google/generative-ai')
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { responseMimeType: "application/json" } })
+    const { GEMINI_CONFIG } = await import('./ai/config');
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_CONFIG.modelName,
+      generationConfig: GEMINI_CONFIG.generationConfig
+    });
 
     const listings = restaurants.map(r =>
       `- Name: ${r.name}\n  Notes: "${(r.notes || '').substring(0, 300)}"`
@@ -608,11 +634,10 @@ ${listings}
 
     Rules for Reviews:
     - CONCISE & KEYWORD-DRIVEN: Use short phrases or keywords, easy to scan.
-    - DO NOT start with the restaurant name (e.g. "Bún bò Bà Già thu hút..." -> "Hương vị truyền thống, nước dùng thơm ngon").
-    - Focus on FOOD/ATMOSPHERE.
-    - NO timestamps, NO "check video", NO meta-references.
-    - If no opinion, describe the dish neutrally.
-    - Keep it under 15 words.
+    - STRICTLY NO NAMES: Never mention the restaurant name.
+    - KEYWORDS ONLY: Use short, punchy phrases. Max 10 words.
+    - FOCUS: Taste, Texture, Atmosphere.
+    - Example: "Nước dùng thanh ngọt, thịt mềm tan." or "Crispy skin, juicy meat, lively vibe."
     - VI summary must be in VIETNAMESE.
     - BANNED WORDS: Do NOT use "hấp dẫn", "ngon", "tuyệt vời", "đậm đà" universally. Use specific sensory words (e.g. "giòn rụm", "thanh ngọt", "béo ngậy", "thơm nức").
     - VARIETY: Ensure each review uses DIFFERENT adjectives.

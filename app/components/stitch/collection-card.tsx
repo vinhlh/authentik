@@ -36,8 +36,8 @@ export function CollectionCard({ collection }: CollectionCardProps) {
   return (
     <Link href={`/collections/${collection.id}`} className="group block h-full">
       <div className="relative h-full bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 border border-transparent hover:border-gray-100 flex flex-col">
-        {/* Image with responsive srcSet */}
-        <div className="aspect-[4/3] relative overflow-hidden bg-gray-100">
+        {/* Image with responsive srcSet - 16:9 Ratio for YouTube style */}
+        <div className="aspect-video relative overflow-hidden bg-gray-100">
           <img
             src={thumbDefault}
             srcSet={thumbSrcSet}

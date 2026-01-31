@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
-import Map, { Marker, NavigationControl, GeolocateControl, ViewStateChangeEvent, GeolocateResultEvent } from 'react-map-gl/mapbox';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import Map, { Marker, NavigationControl, GeolocateControl, ViewStateChangeEvent, GeolocateResultEvent, MapRef } from 'react-map-gl/mapbox';
+import mapboxgl from 'mapbox-gl';
 import { MapPin, Navigation } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Restaurant } from './restaurant-card';
@@ -29,35 +30,23 @@ export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate,
   });
 
   // Calculate bounds to fit all markers
+  const mapRef = useRef<MapRef>(null);
+
+  // Fit bounds to show all markers
   useEffect(() => {
-    if (restaurants.length > 0) {
-      const lats = restaurants.map(r => r.coordinates?.lat).filter((l): l is number => l !== undefined);
-      const lngs = restaurants.map(r => r.coordinates?.lng).filter((l): l is number => l !== undefined);
+    if (restaurants.length > 0 && mapRef.current) {
+      const validCoords = restaurants
+        .map(r => r.coordinates)
+        .filter((c): c is { lat: number, lng: number } => c !== undefined && c !== null);
 
-      if (lats.length > 0 && lngs.length > 0) {
-        const minLat = Math.min(...lats);
-        const maxLat = Math.max(...lats);
-        const minLng = Math.min(...lngs);
-        const maxLng = Math.max(...lngs);
+      if (validCoords.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        validCoords.forEach(c => bounds.extend([c.lng, c.lat]));
 
-        // Calculate zoom based on the spread of coordinates
-        const latDiff = maxLat - minLat;
-        const lngDiff = maxLng - minLng;
-        const maxDiff = Math.max(latDiff, lngDiff);
-
-        // Approximate zoom level (larger spread = lower zoom)
-        let zoom = 14;
-        if (maxDiff > 0.1) zoom = 11;
-        else if (maxDiff > 0.05) zoom = 12;
-        else if (maxDiff > 0.02) zoom = 13;
-        else if (maxDiff > 0.01) zoom = 13.5;
-
-        setViewState(prev => ({
-          ...prev,
-          longitude: (minLng + maxLng) / 2,
-          latitude: (minLat + maxLat) / 2,
-          zoom
-        }));
+        mapRef.current.fitBounds(bounds, {
+          padding: 60,
+          duration: 1000
+        });
       }
     }
   }, [restaurants]);
@@ -87,16 +76,16 @@ export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate,
           onMouseEnter={() => onHoverRestaurant?.(restaurant.id)}
           onMouseLeave={() => onHoverRestaurant?.(null)}
         >
-          {/* Custom teardrop marker SVG */}
-          <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Custom teardrop marker SVG - Smaller Size (28x35) */}
+          <svg width="28" height="35" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
             <path
               d="M16 0C7.163 0 0 7.163 0 16c0 10 16 24 16 24s16-14 16-24c0-8.837-7.163-16-16-16z"
-              fill={isHovered ? '#E74C4C' : '#6B7280'}
+              fill={isHovered ? '#E74C4C' : '#4B5563'} // Gray-600 normally, Red on hover
               stroke="white"
               strokeWidth="2"
             />
           </svg>
-          <span className="absolute top-0 left-0 right-0 flex items-center justify-center text-white text-sm font-bold h-6 mt-1">
+          <span className="absolute top-0 left-0 right-0 flex items-center justify-center text-white text-xs font-bold w-full h-[22px]" style={{ fontSize: '11px', marginTop: '1px' }}>
             {number}
           </span>
         </div>
@@ -107,6 +96,7 @@ export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate,
   return (
     <div className="h-[450px] w-full rounded-xl overflow-hidden border border-stone-200 relative">
       <Map
+        ref={mapRef}
         {...viewState}
         onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
         style={{ width: '100%', height: '100%' }}

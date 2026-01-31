@@ -4,6 +4,14 @@
  */
 
 import { z } from 'zod'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
+import util from 'util'
+import { exec } from 'child_process'
+
+const execAsync = util.promisify(exec)
+
 
 // YouTube transcript API would be used here
 // For now, we'll define the structure
@@ -51,6 +59,39 @@ export function extractVideoId(url: string): string | null {
 }
 
 /**
+ * Fetch metadata via oEmbed (No API Key required)
+ * Fallback when Data API fails
+ */
+async function getOEmbedMetadata(videoId: string): Promise<YouTubeVideoMetadata | null> {
+  try {
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`)
+
+    if (!response.ok) {
+      console.warn(`oEmbed failed: ${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+
+    return {
+      videoId,
+      title: data.title,
+      description: '', // oEmbed doesn't provide description
+      channelName: data.author_name,
+      channelId: '', // Not provided directly
+      publishedAt: new Date().toISOString(), // Unknown
+      duration: 0, // Unknown
+      viewCount: 0,
+      likeCount: 0,
+    }
+  } catch (error) {
+    console.error('oEmbed error:', error)
+    return null
+  }
+}
+
+/**
  * Get video metadata from YouTube Data API
  */
 export async function getVideoMetadata(
@@ -58,52 +99,68 @@ export async function getVideoMetadata(
 ): Promise<YouTubeVideoMetadata | null> {
   const apiKey = process.env.YOUTUBE_API_KEY
 
-  if (!apiKey) {
-    console.warn('⚠️  YOUTUBE_API_KEY not set')
-    return null
+  // Try API First
+  if (apiKey) {
+    console.log(`🔑 Using YouTube API Key: ${apiKey.substring(0, 4)}...`)
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics,contentDetails&key=${apiKey}`
+      )
+
+      // If quota exceeded (403), fallback to oEmbed?
+      if (!response.ok) {
+        console.warn(`⚠️ YouTube API Error: ${response.status}. Trying fallback...`)
+      } else {
+        const data = await response.json()
+        if (data.items && data.items.length > 0) {
+          const video = data.items[0]
+          const snippet = video.snippet
+          const statistics = video.statistics
+          const contentDetails = video.contentDetails
+
+          // Parse ISO 8601 duration
+          const durationMatch = contentDetails.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+          const hours = parseInt(durationMatch?.[1] || '0')
+          const minutes = parseInt(durationMatch?.[2] || '0')
+          const seconds = parseInt(durationMatch?.[3] || '0')
+          const duration = hours * 3600 + minutes * 60 + seconds
+
+          return {
+            videoId,
+            title: snippet.title,
+            description: snippet.description,
+            channelName: snippet.channelTitle,
+            channelId: snippet.channelId,
+            publishedAt: snippet.publishedAt,
+            duration,
+            viewCount: parseInt(statistics.viewCount || '0'),
+            likeCount: parseInt(statistics.likeCount || '0'),
+          }
+        } else {
+          console.warn(`⚠️ YouTube API returned 0 items. Trying fallback...`)
+        }
+      }
+    } catch (error) {
+      console.error('YouTube API Exception:', error)
+    }
+  } else {
+    console.warn('⚠️ YOUTUBE_API_KEY missing. Trying fallback...')
   }
 
-  try {
-    const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics,contentDetails&key=${apiKey}`
-    )
+  // Fallback to oEmbed
+  console.log('🔄 Attempting oEmbed fallback...')
+  const oEmbedData = await getOEmbedMetadata(videoId)
 
-    if (!response.ok) {
-      throw new Error(`YouTube API error: ${response.statusText}`)
-    }
+  if (oEmbedData) {
+    console.log('✅ Recovered metadata via oEmbed')
+    return oEmbedData
+  }
 
-    const data = await response.json()
-
-    if (!data.items || data.items.length === 0) {
-      return null
-    }
-
-    const video = data.items[0]
-    const snippet = video.snippet
-    const statistics = video.statistics
-    const contentDetails = video.contentDetails
-
-    // Parse ISO 8601 duration (PT1H2M3S)
-    const durationMatch = contentDetails.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
-    const hours = parseInt(durationMatch?.[1] || '0')
-    const minutes = parseInt(durationMatch?.[2] || '0')
-    const seconds = parseInt(durationMatch?.[3] || '0')
-    const duration = hours * 3600 + minutes * 60 + seconds
-
-    return {
-      videoId,
-      title: snippet.title,
-      description: snippet.description,
-      channelName: snippet.channelTitle,
-      channelId: snippet.channelId,
-      publishedAt: snippet.publishedAt,
-      duration,
-      viewCount: parseInt(statistics.viewCount || '0'),
-      likeCount: parseInt(statistics.likeCount || '0'),
-    }
-  } catch (error) {
-    console.error('Error fetching video metadata:', error)
-    return null
+  // If both failed, determine the likely cause
+  if (apiKey) {
+    throw new Error(`Video ${videoId} not found (API returned 0 items + oEmbed failed). Likely Private or Deleted.`)
+  } else {
+    throw new Error(`Could not fetch metadata (Missing API Key + oEmbed failed). Check YOUTUBE_API_KEY.`)
   }
 }
 
@@ -119,17 +176,104 @@ export async function getVideoTranscript(videoId: string): Promise<string | null
     // We might need to fetch available transcripts first if we want specific languages like "vi"
     // For now, let's try default behavior which usually grabs auto-generated or English
 
-    // Try to get transcript
-    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
-
-    if (!transcriptItems || transcriptItems.length === 0) {
-      return null
+    // Try to get transcript (default)
+    console.log(`   Trying to fetch transcript for ${videoId}...`)
+    try {
+      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
+      if (transcriptItems && transcriptItems.length > 0) {
+        console.log(`   ✅ Found transcript (${transcriptItems.length} lines)`)
+        return transcriptItems.map(t => t.text).join(' ')
+      }
+    } catch (e) {
+      console.log(`   Default transcript fetch failed. Trying 'vi'...`)
     }
 
-    return transcriptItems.map(t => t.text).join(' ')
+    // Fallback: Try Vietnamese explicitly
+    try {
+      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi' })
+      if (transcriptItems && transcriptItems.length > 0) {
+        console.log(`   ✅ Found VIETNAMESE transcript (${transcriptItems.length} lines)`)
+        return transcriptItems.map(t => t.text).join(' ')
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    // Fallback: Try Auto-generated Vietnamese
+    try {
+      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi-VN' })
+      if (transcriptItems && transcriptItems.length > 0) {
+        console.log(`   ✅ Found VI-VN transcript`)
+        return transcriptItems.map(t => t.text).join(' ')
+      }
+    } catch (e) {
+      console.warn('   ❌ Transcript fetch error:', e)
+    }
+
+    return null
   } catch (error) {
     console.error('Error fetching transcript:', error)
     return null
+  }
+}
+
+/**
+ * Transcribe audio from YouTube video using Gemini
+ * Fallback when transcript is not available
+ */
+export async function transcribeAudio(videoId: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return null
+
+  console.log(`🎙️  Transcribing audio for ${videoId}...`)
+
+  const tempDir = os.tmpdir()
+  const tempFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.m4a`)
+
+  try {
+    // 1. Download Audio (using web client which is most stable)
+    // Note: requires yt-dlp to be installed
+    await execAsync(`yt-dlp -f "bestaudio[ext=m4a]" --extractor-args "youtube:player_client=web" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`)
+
+    if (!fs.existsSync(tempFile)) {
+      throw new Error('Audio download failed')
+    }
+
+    // 2. Upload to Gemini
+    const { GoogleGenerativeAI } = await import('@google/generative-ai')
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const { GEMINI_CONFIG } = await import('../ai/config')
+
+    const model = genAI.getGenerativeModel({
+      model: GEMINI_CONFIG.modelName,
+      generationConfig: GEMINI_CONFIG.generationConfig
+    })
+
+    const fileBuffer = fs.readFileSync(tempFile)
+    const base64Audio = fileBuffer.toString('base64')
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: "audio/mp4",
+          data: base64Audio
+        }
+      },
+      { text: "Generate a full transcript of this audio. Ignore music or silence. Focus on spoken words." }
+    ])
+
+    const text = result.response.text()
+    console.log(`   ✅ Transcribed ${text.length} chars from audio`)
+    return text
+
+  } catch (error) {
+    console.error('   ❌ Transcription failed:', error)
+    return null
+  } finally {
+    // Cleanup
+    if (fs.existsSync(tempFile)) {
+      try { fs.unlinkSync(tempFile) } catch { }
+    }
   }
 }
 
@@ -152,11 +296,13 @@ export async function extractRestaurantsFromTranscript(
     const { GoogleGenerativeAI } = await import('@google/generative-ai')
     const genAI = new GoogleGenerativeAI(apiKey)
 
-    // Use Gemini 1.5 Flash for speed and cost effectiveness
+    const { GEMINI_CONFIG } = await import('../ai/config');
+
+    // Use standardized config
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      generationConfig: { responseMimeType: "application/json" }
-    })
+      model: GEMINI_CONFIG.modelName,
+      generationConfig: GEMINI_CONFIG.generationConfig
+    });
 
     const prompt = `
     You are an expert food critic and data extractor.
@@ -169,15 +315,16 @@ export async function extractRestaurantsFromTranscript(
     - address: The address if mentioned (or "Da Nang" if inferred but not specific).
     - dishes: Array of dishes recommended or eaten there.
     - priceRange: Estimation based on context ("$" = cheap street food, "$$" = casual, "$$$" = upscale).
-    - notes: Brief summary of the reviewer's opinion (e.g., "Best banh mi," "Soup was salty").
+    - notes: Detailed summary of the reviewer's experience. Include atmosphere, specific praise/criticism of food, and why they recommend it. Combine insights from both video description and transcript.
     - timestamp: Approximate timestamp in seconds where it appears (estimate based on text position if possible, otherwise 0).
 
     Return ONLY the JSON array. If no restaurants are clearly identified, return empty array [].
 
     Video Title: ${videoMetadata.title}
     Channel: ${videoMetadata.channelName}
+    Video Description: ${videoMetadata.description}
     Transcript:
-    ${transcript.substring(0, 30000)} // Truncate to avoid token limits if extremely long
+    ${transcript.substring(0, 50000)} // Truncate to avoid token limits if extremely long
     `
 
     const result = await model.generateContent(prompt)
@@ -218,7 +365,10 @@ export async function extractRestaurantsFromTranscript(
     console.error('Error during AI extraction:', error)
     return []
   }
+  return []
 }
+
+
 
 /**
  * Extract restaurants from video description using regex (no AI needed)
@@ -409,24 +559,19 @@ export async function parseYouTubeVideo(url: string): Promise<{
   let metadata = await getVideoMetadata(videoId)
 
   if (!metadata) {
-    console.warn('⚠️ Could not fetch video metadata (API key missing or invalid). Proceeding with defaults.')
-    // valid default metadata just to pass through to extraction
-    metadata = {
-      videoId,
-      title: 'Unknown Video Title',
-      description: '',
-      channelName: 'Unknown Channel',
-      channelId: '',
-      publishedAt: new Date().toISOString(),
-      duration: 0,
-      viewCount: 0,
-      likeCount: 0,
-    }
+    throw new Error('❌ Could not fetch video metadata. Check YOUTUBE_API_KEY.')
   }
 
   // Get transcript
   console.log(`fetching transcript for video: ${videoId}`)
-  const transcript = await getVideoTranscript(videoId)
+  // Get transcript
+  console.log(`fetching transcript for video: ${videoId}`)
+  let transcript = await getVideoTranscript(videoId)
+
+  if (!transcript) {
+    // If no text transcript, try audio transcription
+    transcript = await transcribeAudio(videoId)
+  }
 
   let restaurants: RestaurantMention[]
 
@@ -436,7 +581,7 @@ export async function parseYouTubeVideo(url: string): Promise<{
     restaurants = await extractRestaurantsFromTranscript(transcript, metadata)
   } else {
     // Fallback: try to extract from video description
-    console.log('⚠️ Transcript not available, trying description-based extraction...')
+    console.log('⚠️ Transcript not available. Fallback to Description...')
     restaurants = await extractRestaurantsFromDescription(metadata)
   }
 

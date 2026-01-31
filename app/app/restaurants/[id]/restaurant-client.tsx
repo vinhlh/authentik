@@ -2,6 +2,7 @@
 
 import { useLanguage } from "@/lib/i18n-context";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, MapPin, Star, Utensils, DollarSign, Clock, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -13,6 +14,8 @@ interface RestaurantClientProps {
 
 export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
   const { t, language } = useLanguage();
+  const searchParams = useSearchParams();
+  const collectionId = searchParams.get('collectionId');
   const [restaurant] = useState<any>(initialRestaurant);
 
   if (!restaurant) {
@@ -56,7 +59,7 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
           className="w-full h-full object-cover"
         />
         <div className="absolute top-6 left-6 z-10">
-          <Link href="/" className="bg-white/90 p-2 rounded-full flex items-center gap-2 hover:bg-white transition-colors text-sm font-semibold shadow-sm backdrop-blur-sm">
+          <Link href={collectionId ? `/collections/${collectionId}` : "/"} className="bg-white/90 p-2 rounded-full flex items-center gap-2 hover:bg-white transition-colors text-sm font-semibold shadow-sm backdrop-blur-sm">
             <ArrowLeft className="w-4 h-4" /> {t('common.viewAll')}
           </Link>
         </div>
@@ -161,21 +164,26 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
           <div className="w-full md:w-[320px] shrink-0 space-y-4">
             {/* Opening Hours */}
             {restaurant.opening_hours && (
-              <div className="p-6 border rounded-2xl bg-gray-50">
-                <h3 className="font-bold mb-4 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-500" /> {t('restaurant.openingHours')}
+              <div className="p-6 border border-gray-100 rounded-3xl bg-white shadow-sm">
+                <h3 className="font-bold mb-4 flex items-center gap-2 text-lg">
+                  <Clock className="w-5 h-5 text-gray-400" /> {t('restaurant.openingHours')}
                 </h3>
                 <div className="space-y-3 text-sm text-gray-600">
-                  {restaurant.opening_hours.weekday_text?.map((day: string) => (
-                    <div key={day} className="flex justify-between py-1 border-b border-gray-100 last:border-0 last:pb-0">
-                      {day}
-                    </div>
-                  )) || (
+                  {restaurant.opening_hours.weekday_text?.map((day: string) => {
+                    const [d, t] = day.split(': ', 2);
+                    return (
+                      <div key={day} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 last:pb-0">
+                        <span className="font-medium text-gray-900">{d}</span>
+                        <span className="text-gray-500">{t}</span>
+                      </div>
+                    );
+                  }) || (
                       <p className="text-gray-500 italic">{t('restaurant.hoursUnavailable')}</p>
                     )}
                 </div>
                 {restaurant.opening_hours.open_now !== undefined && (
-                  <div className={`mt-4 text-center py-2 rounded-lg text-sm font-bold ${restaurant.opening_hours.open_now ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <div className={`mt-5 text-center py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 ${restaurant.opening_hours.open_now ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                    <div className={`w-2 h-2 rounded-full ${restaurant.opening_hours.open_now ? 'bg-green-500' : 'bg-red-500'}`} />
                     {restaurant.opening_hours.open_now ? t('restaurant.openNow') : t('restaurant.closed')}
                   </div>
                 )}
@@ -184,7 +192,13 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
 
             {/* Actions */}
             <div className="space-y-3">
-              <Button className="w-full h-12 text-base font-bold bg-primary hover:bg-primary-dark shadow-md shadow-primary-light/50">
+              <Button
+                className="w-full h-12 text-base font-bold bg-primary hover:bg-primary-dark shadow-lg shadow-primary/20 rounded-xl"
+                onClick={() => {
+                  const query = encodeURIComponent(`${restaurant.name} ${restaurant.address}`);
+                  window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
+                }}
+              >
                 {t('restaurant.getDirections')}
               </Button>
               {restaurant.website && (
@@ -192,7 +206,7 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
                   href={restaurant.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center w-full h-12 rounded-md border border-gray-200 font-bold hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-center w-full h-12 rounded-xl border border-gray-200 font-bold hover:bg-gray-50 transition-colors text-sm"
                 >
                   {t('restaurant.visitWebsite')}
                 </a>
@@ -200,7 +214,7 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
               {restaurant.phone_number && (
                 <a
                   href={`tel:${restaurant.phone_number}`}
-                  className="flex items-center justify-center w-full h-12 rounded-md border border-gray-200 font-bold hover:bg-gray-50 transition-colors text-gray-700"
+                  className="flex items-center justify-center w-full h-12 rounded-xl border border-gray-200 font-bold hover:bg-gray-50 transition-colors text-gray-700 text-sm"
                 >
                   {t('restaurant.call')} {restaurant.phone_number}
                 </a>
@@ -208,13 +222,14 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
             </div>
 
             {/* Location Map */}
-            <div className="rounded-2xl overflow-hidden border h-[240px]">
+            <div className="rounded-3xl overflow-hidden border border-gray-100 h-[240px] shadow-sm relative z-0">
               <iframe
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
                 loading="lazy"
                 src={`https://maps.google.com/maps?q=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                className="w-full h-full"
               ></iframe>
             </div>
           </div>

@@ -78,6 +78,7 @@ export function CollectionContent({ collection, restaurants, coverImage, coverIm
                       isHovered={hoveredRestaurantId === restaurant.id || selectedRestaurantId === restaurant.id}
                       onMouseEnter={() => setHoveredRestaurantId(restaurant.id)}
                       onMouseLeave={() => setHoveredRestaurantId(null)}
+                      collectionId={collection.id}
                     />
                   </div>
                 ))}

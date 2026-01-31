@@ -761,6 +761,55 @@ export interface EnhancedPhoto {
  * Select best photos from Google Places
  * Prioritizes food photos (typically smaller/portrait) over exterior/interior shots
  */
+/**
+ * Calculate a score for a photo based on heuristics
+ * Higher score = more likely to be a food photo
+ */
+export function calculatePhotoScore(photo: { width: number; height: number }): { score: number; category: EnhancedPhoto['category'] } {
+  let score = 50 // Base score
+  let category: EnhancedPhoto['category'] = 'unknown'
+
+  const aspectRatio = photo.width / photo.height
+
+  // Heuristics for Food vs Place (Relaxed per user feedback)
+  // - Phone photos can be any aspect ratio (Portrait, Square, 4:3, 16:9)
+  // - We only want to filter out obvious non-food like panoramas or tiny icons
+
+  if (aspectRatio <= 1.0) {
+    // Portrait or Square (e.g. 3:4, 9:16, 1:1)
+    // Slight boost as these are very common for food/Instagram
+    score += 20
+    category = 'food'
+  } else if (aspectRatio > 1.0 && aspectRatio <= 1.8) {
+    // Standard Landscape (4:3, 3:2, 16:9)
+    // Neutral score - could be food or environment
+    score += 5
+    category = 'unknown'
+  } else if (aspectRatio > 1.8) {
+    // Wide Panorama (> 16:9) - Likely environment/street view
+    score -= 40
+    category = 'exterior'
+  }
+
+  // Size heuristics
+  // Penalize only extreme sizes
+  if (photo.width > 5000) {
+    // Very high res professional/panorama
+    score -= 20
+  }
+
+  if (photo.width < 500) {
+    // Too small/low quality
+    score -= 20
+  }
+
+  return { score, category }
+}
+
+/**
+ * Select best photos from Google Places
+ * Prioritizes food photos (typically smaller/portrait) over exterior/interior shots
+ */
 export function selectBestPhotos(
   place: PlaceDetails,
   maxPhotos: number = 5
@@ -770,30 +819,7 @@ export function selectBestPhotos(
   }
 
   const scoredPhotos: EnhancedPhoto[] = place.photos.map(photo => {
-    let score = 50 // Base score
-    let category: EnhancedPhoto['category'] = 'unknown'
-
-    const aspectRatio = photo.width / photo.height
-
-    // Food photos tend to be:
-    // - Square or portrait (aspect ratio ≤ 1.2)
-    // - Medium resolution (not too large exterior shots)
-    if (aspectRatio <= 1.2) {
-      score += 30
-      category = 'food'
-    } else if (aspectRatio > 1.5) {
-      // Wide shots are usually exterior/interior
-      category = aspectRatio > 2 ? 'exterior' : 'interior'
-      score -= 10
-    }
-
-    // Prefer medium-sized photos (food close-ups)
-    // Very large photos are often exterior shots
-    if (photo.width >= 1000 && photo.width <= 2000) {
-      score += 15
-    } else if (photo.width > 3000) {
-      score -= 10
-    }
+    const { score, category } = calculatePhotoScore(photo)
 
     return {
       url: getPhotoUrl(photo.photo_reference, 800),
