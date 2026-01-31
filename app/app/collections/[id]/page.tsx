@@ -12,21 +12,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
 
   // Fetch collection
-  const { data: collection } = await supabase
+  const { data: collection, error } = await supabase
     .from('collections')
-    .select('name, name_vi, name_en, description, description_vi, description_en, source_url')
+    .select('name_vi, name_en, description_vi, description_en, source_url')
     .eq('id', id)
     .single();
 
-  if (!collection && id !== "1") {
-    return {
-      title: "Collection Not Found | Authentik",
-    }
+  if (error) {
+    console.error(`[generateMetadata] Supabase error for id=${id}:`, error.message);
   }
 
+  // Removed early return to allow fallbacks
+  // if (!collection && id !== "1") { return { title: "Collection Not Found" } }
+
+
   // Use mock data if mocked
-  const name = collection?.name_en || collection?.name || (id === "1" ? "Best Bánh Mì in Da Nang" : "Authentik Collection");
-  const description = collection?.description_en || collection?.description || (id === "1" ? "A curated tour of the crispiest, most flavorful Bánh Mì spots in the city." : "Discover authentic food in Da Nang.");
+  const name = collection?.name_en || collection?.name_vi || (id === "1" ? "Best Bánh Mì in Da Nang" : "Authentik Collection");
+  const description = collection?.description_en || collection?.description_vi || (id === "1" ? "A curated tour of the crispiest, most flavorful Bánh Mì spots in the city." : "Discover authentic food in Da Nang.");
 
   // Extract video ID for cover image
   const videoId = collection?.source_url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1] || (id === "1" ? "dQw4w9WgXcQ" : null);

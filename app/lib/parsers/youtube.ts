@@ -231,9 +231,8 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
   const tempFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.m4a`)
 
   try {
-    // 1. Download Audio (using web client which is most stable)
-    // Note: requires yt-dlp to be installed
-    await execAsync(`yt-dlp -f "bestaudio[ext=m4a]" --extractor-args "youtube:player_client=web" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`)
+    // 1. Download Audio (using tv_embedded client which bypasses PO Token)
+    await execAsync(`yt-dlp -f "bestaudio[ext=m4a]" --extractor-args "youtube:player_client=tv_embedded" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`)
 
     if (!fs.existsSync(tempFile)) {
       throw new Error('Audio download failed')
