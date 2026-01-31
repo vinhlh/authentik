@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await extractFromVideo(url, creatorName || 'Unknown Creator')
+    const result = await extractFromVideo(url, creatorName || 'Authentik')
 
     return NextResponse.json({
       success: true,

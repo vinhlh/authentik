@@ -45,7 +45,7 @@ async function main() {
 }
 
 async function handleExtract(url: string, creator: string | undefined) {
-  const creatorName = creator || 'Unknown Creator'
+  const creatorName = creator || 'Authentik'
 
   if (!url) {
     console.error('❌ Error: Video URL is required')
@@ -64,7 +64,7 @@ async function handleExtract(url: string, creator: string | undefined) {
     } else {
       console.log('\n✅ Extraction complete!')
       console.log(`\nCollection ID: ${result.collection.id}`)
-      console.log(`Collection Name: ${result.collection.name}`)
+      console.log(`Collection Name: ${result.collection.name_vi || result.collection.name}`)
       console.log(`\nRestaurants imported: ${result.stats.imported}/${result.stats.totalMentions}`)
     }
   } catch (error) {

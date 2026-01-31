@@ -15,6 +15,8 @@ export const metadata: Metadata = {
   keywords: ["Da Nang", "food", "restaurants", "authentic", "local", "Vietnam"],
 };
 
+import { LanguageProvider } from "@/lib/i18n-context";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,11 +25,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="light">
       <body className={`${inter.variable} font-sans antialiased bg-[#fafaf9] text-[#1c1917] min-h-screen`}>
-        <div className="layout-container flex flex-col">
-          <Header />
-          {children}
-          <Footer />
-        </div>
+        <LanguageProvider>
+          <div className="layout-container flex flex-col">
+            <Header />
+            {children}
+            <Footer />
+          </div>
+        </LanguageProvider>
       </body>
     </html>
   );

@@ -4,10 +4,14 @@
  * Using Places API (New) - https://developers.google.com/maps/documentation/places/web-service
  */
 
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY!
-
-if (!GOOGLE_PLACES_API_KEY) {
-  console.warn('⚠️  GOOGLE_PLACES_API_KEY not set - Places API features will not work')
+// Use getter function to read API key at runtime (not at module load time)
+function getApiKey(): string {
+  const key = process.env.GOOGLE_PLACES_API_KEY
+  if (!key) {
+    console.warn('⚠️  GOOGLE_PLACES_API_KEY not set - Places API features will not work')
+    return ''
+  }
+  return key
 }
 
 // Places API (New) v1 endpoints
@@ -21,7 +25,7 @@ const PLACES_API_LEGACY = 'https://maps.googleapis.com/maps/api/place'
 function getApiHeaders(fieldMask: string): HeadersInit {
   return {
     'Content-Type': 'application/json',
-    'X-Goog-Api-Key': GOOGLE_PLACES_API_KEY,
+    'X-Goog-Api-Key': getApiKey(),
     'X-Goog-FieldMask': fieldMask,
   }
 }
@@ -172,13 +176,22 @@ export async function searchPlace(
 export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
   const fieldMask = 'id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,types,photos,nationalPhoneNumber,regularOpeningHours,currentOpeningHours,websiteUri,reviews'
 
-  const response = await fetch(`${PLACES_API_NEW}/places/${placeId}`, {
+  // Ensure place ID is clean (strip any prefix if accidentally included)
+  const cleanPlaceId = placeId.startsWith('places/') ? placeId.substring(7) : placeId
+
+  const url = `${PLACES_API_NEW}/places/${cleanPlaceId}`
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: getApiHeaders(fieldMask),
   })
 
   if (!response.ok) {
+    const errorText = await response.text()
     console.error(`Google Places API error: ${response.status}`)
+    console.error(`  Place ID: ${cleanPlaceId}`)
+    console.error(`  URL: ${url}`)
+    console.error(`  Response: ${errorText}`)
     return null
   }
 
@@ -198,17 +211,58 @@ export function getPhotoUrl(
 ): string {
   // New API photo references look like: places/PLACE_ID/photos/PHOTO_REFERENCE
   if (photoReference.startsWith('places/')) {
-    return `${PLACES_API_NEW}/${photoReference}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_PLACES_API_KEY}`
+    return `${PLACES_API_NEW}/${photoReference}/media?maxWidthPx=${maxWidth}&key=${getApiKey()}`
   }
 
   // Legacy photo reference - use legacy endpoint
   const params = new URLSearchParams({
     photo_reference: photoReference,
     maxwidth: maxWidth.toString(),
-    key: GOOGLE_PLACES_API_KEY,
+    key: getApiKey(),
   })
 
   return `${PLACES_API_LEGACY}/photo?${params.toString()}`
+}
+
+/**
+ * Check if a place matches valid food venue types
+ */
+function isValidFoodVenue(place: PlaceSearchResult): boolean {
+  if (!place.types || place.types.length === 0) return false
+
+  // Explicitly excluded types (locations, services, etc.)
+  const EXCLUDED_TYPES = [
+    'locality', 'political', 'sublocality', 'administrative_area_level_1',
+    'administrative_area_level_2', 'country', 'continent',
+    'airport', 'park', 'school', 'university', 'gym', 'health',
+    'finance', 'place_of_worship', 'church', 'hindu_temple', 'mosque', 'synagogue',
+    'cemetery', 'rv_park', 'campground', 'bus_station', 'train_station'
+  ]
+
+  // If it's a generic location/geo-political entity, reject it
+  if (place.types.some(t => EXCLUDED_TYPES.includes(t))) {
+    // Determine if it's mixed use (e.g. hotel + restaurant)?
+    // Usually a Hotel is 'lodging', but if it has 'restaurant', it's valid.
+    // But 'locality' (City) is NEVER valid.
+    if (place.types.some(t => ['locality', 'political', 'country', 'administrative_area_level_1'].includes(t))) {
+      return false
+    }
+  }
+
+  // Must have at least one of these specific food types
+  // Note: 'food' is too generic (could be grocery), so we avoid it unless combined with others?
+  const REQUIRED_TYPES = [
+    'restaurant', 'cafe', 'bakery', 'bar', 'meal_takeaway', 'meal_delivery',
+    'ice_cream_shop', 'night_club', 'coffee_shop', 'sandwich_shop', 'steak_house'
+  ]
+
+  // Check if any of the place types indicate it's a food establishment
+  // Google Places types are specific (e.g., 'vietnamese_restaurant'), so we check valid substrings too
+  return place.types.some(t =>
+    REQUIRED_TYPES.includes(t) ||
+    t.includes('restaurant') ||
+    t === 'food_court' // Specific enough
+  )
 }
 
 /**
@@ -228,9 +282,16 @@ export async function verifyRestaurant(
       return null
     }
 
-    // Get detailed information for the first result
-    const placeId = results[0].place_id
-    const details = await getPlaceDetails(placeId)
+    // Find the first result that is actually a food venue
+    const validPlace = results.find(isValidFoodVenue)
+
+    if (!validPlace) {
+      console.log(`❌ Found results for "${name}" but none were valid food venues (Top: ${results[0].name} - [${results[0].types?.join(', ')}])`)
+      return null
+    }
+
+    // Get detailed information for the valid place
+    const details = await getPlaceDetails(validPlace.place_id)
 
     return details
   } catch (error) {
@@ -319,7 +380,7 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
   // Signal: Review quality
   if (suspiciousRatio > 0.5) {
     signals.push({
-      name: 'Review Quality',
+      name: 'signal.reviewQuality',
       value: 'negative',
       description: 'Many suspicious reviews detected',
       icon: '⚠️'
@@ -327,7 +388,7 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
     score -= 0.15
   } else if (suspiciousRatio < 0.2 && credibleReviews.length >= 3) {
     signals.push({
-      name: 'Review Quality',
+      name: 'signal.reviewQuality',
       value: 'positive',
       description: 'Genuine, detailed reviews',
       icon: '✅'
@@ -347,21 +408,21 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
 
   if (vietnameseRatio > 0.6) {
     signals.push({
-      name: 'Local Reviews',
+      name: 'signal.localReviews',
       value: 'positive',
       description: `Loved by Vietnamese reviewers (${Math.round(vietnameseRatio * 100)}% local)`,
       icon: '🇻🇳'
     })
   } else if (vietnameseRatio < 0.2) {
     signals.push({
-      name: 'Local Reviews',
+      name: 'signal.localReviews',
       value: 'negative',
       description: 'Mostly foreign reviews',
       icon: '🌍'
     })
   } else {
     signals.push({
-      name: 'Local Reviews',
+      name: 'signal.localReviews',
       value: 'neutral',
       description: 'Mixed local and tourist reviews',
       icon: '🤝'
@@ -375,14 +436,14 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
 
     if (details.price_level <= 1) {
       signals.push({
-        name: 'Price',
+        name: 'signal.price',
         value: 'positive',
         description: 'Street food prices',
         icon: '💰'
       })
     } else if (details.price_level >= 3) {
       signals.push({
-        name: 'Price',
+        name: 'signal.price',
         value: 'negative',
         description: 'Tourist pricing',
         icon: '💸'
@@ -401,7 +462,7 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
     if (hasLocalTypes && !hasTouristTypes) {
       score += 0.2
       signals.push({
-        name: 'Location',
+        name: 'signal.location',
         value: 'positive',
         description: 'Local neighborhood spot',
         icon: '🏘️'
@@ -409,7 +470,7 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
     } else if (hasTouristTypes) {
       score -= 0.1
       signals.push({
-        name: 'Location',
+        name: 'signal.location',
         value: 'negative',
         description: 'In tourist area',
         icon: '📸'
@@ -424,7 +485,7 @@ export function calculateAuthenticityWithSignals(details: PlaceDetails): Authent
 
     if (details.rating >= 4.2 && details.user_ratings_total >= 50) {
       signals.push({
-        name: 'Reputation',
+        name: 'signal.reputation',
         value: 'positive',
         description: `Consistently rated ${details.rating}★ (${details.user_ratings_total} reviews)`,
         icon: '⭐'
@@ -469,27 +530,27 @@ function createResult(
 
   if (score >= 0.8) {
     badge = 'LOCAL_GEM'
-    badgeLabel = 'Local Gem'
+    badgeLabel = 'badge.localGem'
     badgeIcon = '🏆'
     level = 5
   } else if (score >= 0.65) {
     badge = 'NEIGHBORHOOD_SPOT'
-    badgeLabel = 'Neighborhood Spot'
+    badgeLabel = 'badge.neighborhoodSpot'
     badgeIcon = '🏠'
     level = 4
   } else if (score >= 0.45) {
     badge = 'MIXED_CROWD'
-    badgeLabel = 'Mixed Crowd'
+    badgeLabel = 'badge.mixedCrowd'
     badgeIcon = '🤝'
     level = 3
   } else if (score >= 0.25) {
     badge = 'TOURIST_FAVORITE'
-    badgeLabel = 'Tourist Favorite'
+    badgeLabel = 'badge.touristFavorite'
     badgeIcon = '📸'
     level = 2
   } else {
     badge = 'TOURIST_TRAP'
-    badgeLabel = 'Tourist Trap'
+    badgeLabel = 'badge.touristTrap'
     badgeIcon = '⚠️'
     level = 1
   }

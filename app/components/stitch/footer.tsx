@@ -1,10 +1,11 @@
 import { Utensils, Send } from "lucide-react";
 
 export function Footer() {
+  return null
   return (
     <footer className="bg-white border-t border-gray-100 py-12 mt-12 text-sm">
-      <div className="max-w-[1200px] mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8">
-        {/* <div className="col-span-1">
+      {/* <div className="max-w-[1200px] mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8"> */}
+      {/* <div className="col-span-1">
           <div className="flex items-center gap-2 mb-4">
             <Utensils className="text-primary w-6 h-6" />
             <h2 className="text-xl font-bold tracking-tight text-primary">
@@ -16,7 +17,7 @@ export function Footer() {
             hidden alleyways to coastal feasts.
           </p>
         </div> */}
-        {/* <div>
+      {/* <div>
           <h4 className="font-bold mb-4 text-[#1c1917] dark:text-white">
             Explore
           </h4>
@@ -72,10 +73,10 @@ export function Footer() {
             </button>
           </div>
         </div> */}
-      </div>
+      {/* </div>
       <div className="max-w-[1200px] mx-auto px-6 mt-12 pt-8 border-t border-gray-100 text-center text-xs text-gray-400">
         © 2026 Authentik
-      </div>
+      </div> */}
     </footer>
   );
 }

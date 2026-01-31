@@ -83,7 +83,8 @@ body {
 
 @media (min-width: 1024px) {
   .masonry {
-    column-count: 3;
+    column-count: 2;
+    /* Keep at 2 since map sidebar takes space */
   }
 }
 

@@ -44,7 +44,7 @@ export async function discoverTikTokChannel(
 
     for await (const line of stream) {
       try {
-        const video = JSON.parse(line)
+        const video = JSON.parse(line as string)
         videos.push(video)
         process.stdout.write(`\r   Scanning: found ${videos.length} videos...`) // Update same line
       } catch (e) {

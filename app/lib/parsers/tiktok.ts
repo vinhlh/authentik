@@ -152,7 +152,7 @@ async function extractWithGemini(
   const text = response.text()
 
   // Clean JSON (handle markdown code blocks)
-  let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim()
+  const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim()
 
   // Find array
   const jsonMatch = cleanText.match(/\[[\s\S]*\]/)

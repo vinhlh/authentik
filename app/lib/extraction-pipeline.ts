@@ -15,6 +15,8 @@ import {
 import { supabase } from './supabase'
 import { processRestaurantPhotos, createSlug } from './photo-pipeline'
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 export interface ExtractionOptions {
   dry?: boolean  // Preview mode - don't import to database
 }
@@ -23,6 +25,10 @@ export interface ExtractionResult {
   collection: {
     id: string
     name: string
+    name_vi?: string
+    name_en?: string | null
+    description_vi?: string | null
+    description_en?: string | null
     creator_name: string
     source_url: string
   }
@@ -78,45 +84,41 @@ export async function extractFromVideo(
 
   console.log(`✅ Found ${restaurants.length} restaurant mentions`)
 
-  // Refine collection name using AI (always enabled for text)
-  let collectionName = metadata?.title || `Collection from ${creatorName}`
+  // --- OPTIMIZED: Unified AI Extraction ---
+  console.log(`🧠 AI Processing: Generating unified collection details and reviews...`)
+  let unifiedData = await generateUnifiedExtraction(
+    metadata || { title: '', description: '' },
+    restaurants,
+    creatorName
+  )
 
-  if (metadata?.title) {
-    try {
-      const refinedName = await generateConciseCollectionName(metadata.title, creatorName)
-      if (refinedName) {
-        console.log(`✨ AI Refined Name: "${collectionName}" -> "${refinedName}"`)
-        collectionName = refinedName
-      }
-    } catch (e) {
-      console.warn('Failed to refine collection name with AI, using original.')
-    }
-  }
-
-  // Refine collection description using AI (new request)
-  let collectionDescription = metadata?.description || null
-
-  if (metadata?.description && metadata.description.length > 100) {
-    try {
-      const refinedDesc = await generateConciseDescription(metadata.description, creatorName)
-      if (refinedDesc) {
-        console.log(`✨ AI Refined Description: length ${metadata.description.length} -> ${refinedDesc.length}`)
-        collectionDescription = refinedDesc
-      }
-    } catch (e) {
-      console.warn('Failed to refine description with AI, using original.')
-    }
-  }
+  // Use AI data or fallbacks
+  const collectionName = unifiedData?.collection.name_vi || metadata?.title || `Collection from ${creatorName}`
+  const collectionDescription = unifiedData?.collection.description_vi || metadata?.description || null
+  const nameEn = unifiedData?.collection.name_en || null
+  const descriptionEn = unifiedData?.collection.description_en || null
 
   // In dry mode, create a mock collection
-  let collection: { id: string; name: string }
+  let collection: {
+    id: string;
+    name: string;
+    name_vi?: string;
+    name_en?: string | null;
+    description_vi?: string | null;
+    description_en?: string | null;
+    creator_name?: string;
+    source_url?: string;
+  }
 
   if (dry) {
     collection = {
       id: 'dry-run-preview',
       name: collectionName,
+      name_vi: collectionName,
     }
     console.log(`📝 Would create collection: ${collection.name}`)
+    if (nameEn) console.log(`   (EN): ${nameEn}`)
+    if (descriptionEn) console.log(`   (EN Desc): ${descriptionEn?.substring(0, 50)}...`)
   } else {
     // Check if collection already exists by source_url
     const { data: existingCollection } = await supabase
@@ -126,13 +128,15 @@ export async function extractFromVideo(
       .single()
 
     if (existingCollection) {
-      console.log(`🔄 Found existing collection: ${existingCollection.name}`)
+      console.log(`🔄 Found existing collection: ${existingCollection.name_vi || existingCollection.name}`)
       // Update existing
       const { data: updated, error: updateError } = await supabase
         .from('collections')
         .update({
-          name: collectionName, // Update name if video title changed
-          description: collectionDescription,
+          name_vi: collectionName, // Update name if video title changed
+          description_vi: collectionDescription,
+          name_en: nameEn,
+          description_en: descriptionEn,
           creator_name: creatorName,
           // Don't update source_url as it matched
         })
@@ -144,14 +148,16 @@ export async function extractFromVideo(
         throw new Error(`Failed to update collection: ${updateError?.message}`)
       }
       collection = updated
-      console.log(`✅ Updated collection: ${collection.name}`)
+      console.log(`✅ Updated collection: ${collection.name_vi || collection.name}`)
     } else {
       // Create new collection
       const { data: dbCollection, error: collectionError } = await supabase
         .from('collections')
         .insert({
-          name: collectionName,
-          description: collectionDescription,
+          name_vi: collectionName,
+          description_vi: collectionDescription,
+          name_en: nameEn,
+          description_en: descriptionEn,
           creator_name: creatorName,
           source_url: url,
         })
@@ -163,7 +169,7 @@ export async function extractFromVideo(
       }
 
       collection = dbCollection
-      console.log(`📝 Created collection: ${collection.name}`)
+      console.log(`📝 Created collection: ${collection.name_vi || collection.name}`)
     }
   }
 
@@ -222,6 +228,14 @@ export async function extractFromVideo(
         if (photos.length > 0) {
           console.log(`   📸 Photos: ${photos.length} selected`)
         }
+
+        // Match Unified Review
+        const unifiedReview = unifiedData?.reviews.find(r => r.restaurant_name === mention.name)
+        if (unifiedReview) {
+          console.log(`   ✨ AI Review (VI): "${unifiedReview.summary_vi}"`)
+          console.log(`   ✨ AI Review (EN): "${unifiedReview.summary_en}"`)
+        }
+
         stats.imported++ // Count as "would be imported"
         results.push({ mention, verified, imported: false })
       } else {
@@ -229,8 +243,24 @@ export async function extractFromVideo(
         const restaurantId = await importRestaurant(verified, mention)
 
         if (restaurantId) {
+          // Get AI review summaries from Unified Data
+          let aiSummaryEn: string | null = null
+          let aiSummaryVi: string | null = null
+
+          const unifiedReview = unifiedData?.reviews.find(r => r.restaurant_name === mention.name);
+          if (unifiedReview) {
+            aiSummaryVi = unifiedReview.summary_vi;
+            aiSummaryEn = unifiedReview.summary_en;
+            console.log(`   ✨ AI Review (VI): "${aiSummaryVi}"`)
+          } else if (mention.notes && mention.notes.length > 20) {
+            // Fallback to individual call if missed in unified pass (rare but possible)
+            console.log(`   ⚠️ Missed in unified pass, generating fallback review...`);
+            aiSummaryVi = await generateReviewSummary(mention.notes, creatorName, verified.name);
+            await delay(12000);
+          }
+
           // Link to collection (upsert/handle duplicates)
-          await linkRestaurantToCollection(collection.id, restaurantId, mention, verified)
+          await linkRestaurantToCollection(collection.id, restaurantId, mention, verified, aiSummaryEn, aiSummaryVi)
 
           stats.imported++
           results.push({ mention, verified, imported: true, restaurantId })
@@ -255,7 +285,7 @@ export async function extractFromVideo(
   return {
     collection: {
       id: collection.id,
-      name: collection.name,
+      name: collection.name_vi || collection.name,
       creator_name: creatorName,
       source_url: url,
     },
@@ -350,7 +380,9 @@ async function linkRestaurantToCollection(
   collectionId: string,
   restaurantId: string,
   mention: RestaurantMention,
-  verified: PlaceDetails
+  verified: PlaceDetails,
+  aiSummaryEn: string | null = null,
+  aiSummaryVi: string | null = null
 ): Promise<void> {
   // Try to insert
   const { error } = await supabase
@@ -359,18 +391,24 @@ async function linkRestaurantToCollection(
       collection_id: collectionId,
       restaurant_id: restaurantId,
       notes: mention.notes,
-      recommended_dishes: mention.dishes || null
+      recommended_dishes: mention.dishes || null,
+      ai_summary_en: aiSummaryEn,
+      ai_summary_vi: aiSummaryVi
     })
 
   if (error) {
     if (error.code === '23505') { // Unique violation
-      console.log(`   🔗 Already linked to collection (Updating notes)`)
+      console.log(`   🔗 Already linked to collection (Updating notes & review)`)
+      const updateData: any = {
+        notes: mention.notes,
+        recommended_dishes: mention.dishes || null,
+      }
+      if (aiSummaryEn) updateData.ai_summary_en = aiSummaryEn;
+      if (aiSummaryVi) updateData.ai_summary_vi = aiSummaryVi;
+
       await supabase
         .from('collection_restaurants')
-        .update({
-          notes: mention.notes,
-          recommended_dishes: mention.dishes || null
-        })
+        .update(updateData)
         .eq('collection_id', collectionId)
         .eq('restaurant_id', restaurantId)
     } else {
@@ -510,49 +548,104 @@ export async function batchExtract(
   return results
 }
 
-
 /**
- * Use AI to generate a concise, attractive collection name
+ * Use AI to generate a unified set of extraction data (JSON)
+ * Combines Name, Description, and Reviews into a SINGLE request.
  */
-async function generateConciseCollectionName(
-  originalTitle: string,
+async function generateUnifiedExtraction(
+  metadata: { title?: string; description?: string },
+  restaurants: RestaurantMention[],
   creatorName: string
-): Promise<string | null> {
+): Promise<{
+  collection: {
+    name_vi: string;
+    name_en: string;
+    description_vi: string;
+    description_en: string;
+  };
+  reviews: Array<{
+    restaurant_name: string;
+    summary_vi: string;
+    summary_en: string;
+  }>;
+} | null> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
 
   try {
     const { GoogleGenerativeAI } = await import('@google/generative-ai')
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }) // Available per list-models output
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { responseMimeType: "application/json" } })
+
+    const listings = restaurants.map(r =>
+      `- Name: ${r.name}\n  Notes: "${(r.notes || '').substring(0, 300)}"`
+    ).join('\n');
 
     const prompt = `
-    Refine this video title into a concise, attractive collection name for a food discovery app.
+    You are an AI editor for a food discovery app. Process this video data and output a JSON object.
 
-    Current Title: "${originalTitle}"
-    Creator: "${creatorName}"
+    Input Data:
+    - Creator: "${creatorName}"
+    - Video Title: "${metadata.title || ''}"
+    - Description: "${(metadata.description || '').substring(0, 1000)}"
+    - Restaurants:
+${listings}
 
-    Rules:
-    1. Remove episode numbers (e.g., #290, Vol. 1, Part 2).
-    2. Remove SEO keywords, clickbait phrases (e.g., "Must Try", "Shocking", "Too delicious").
-    3. Remove excessive punctuation or separators (e.g., " | ", " - ").
-    4. Focus on the core topic (Location + Food Type).
-    5. You MAY format it as "Food Topic inside Location with CreatorName" if it sounds natural in the original language (e.g., "Ẩm thực đường phố Đà Nẵng cùng Yêu Máy Bay").
-    6. Keep it in the ORIGINAL language (Vietnamese).
-    7. Return ONLY the new name, no quotes or explanations.
-    `
+    Tasks:
+    1. Refine the Collection Name (VI & EN): Concise, no episode numbers/SEO fluff.
+    2. Refine the Collection Description (VI & EN): Engaging, 2-3 sentences.
+    3. Generate a 1-sentence Review Summary for each restaurant (VI & EN).
 
-    // Simple retry logic with linear backoff
+    Rules for Collection Name:
+    - Remove episode numbers (e.g. #290), SEO keywords (e.g. "Must Try"), and excessive punctuation.
+    - Format: "Food Topic inside Location with CreatorName" if natural.
+    - SPECIAL: If Creator is generic (like "Authentik"), use the real host name if found in the title.
+
+    Rules for Description:
+    - Remove social links, affiliate links, "Subscribe" requests.
+    - Focus on FOOD experience and LOCATION.
+    - SPECIAL: Do NOT use generic creator names like "Authentik" as a person's name.
+
+    Rules for Reviews:
+    - Focus on FOOD/ATMOSPHERE.
+    - NO timestamps, NO "check video", NO meta-references.
+    - If no opinion, describe the dish neutrally.
+    - Keep it under 20 words.
+    - VI summary must be in VIETNAMESE.
+    - BANNED WORDS: Do NOT use "hấp dẫn", "ngon", "tuyệt vời", "đậm đà" universally. Use specific sensory words (e.g. "giòn rụm", "thanh ngọt", "béo ngậy", "thơm nức").
+    - VARIETY: Ensure each review uses DIFFERENT adjectives.
+
+    Output JSON Schema:
+    {
+      "collection": {
+        "name_vi": "Refined Name VI",
+        "name_en": "English Name",
+        "description_vi": "Refined Description VI",
+        "description_en": "English Description"
+      },
+      "reviews": [
+        {
+          "restaurant_name": "Exact Name Match",
+          "summary_vi": "Vietnamese Review",
+          "summary_en": "English Review"
+        }
+      ]
+    }
+    `;
+
+    console.log("🚀 Sending Unified Gemini Request...");
+
+    // Retry logic
     let result
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       try {
         result = await model.generateContent(prompt)
         break
       } catch (e: any) {
         if (e.message?.includes('429') || e.status === 429) {
-          if (i === 2) throw e // Rethrow on last attempt
-          const waitTime = (i + 1) * 2000
-          console.log(`⏳ AI Rate limit hit.Retrying in ${waitTime / 1000}s...`)
+          if (i === 4) throw e
+          const waitTime = (i + 1) * 15000
+          console.log(`⏳ AI Rate limit hit. Retrying in ${waitTime / 1000}s...`)
           await new Promise(resolve => setTimeout(resolve, waitTime))
         } else {
           throw e
@@ -560,59 +653,76 @@ async function generateConciseCollectionName(
       }
     }
 
-    if (!result) return null; // Should not trigger if throw works correctly
-    const response = await result.response
-    const text = response.text()?.trim().replace(/^["']|["']$/g, '') // Remove quotes
+    if (!result) return null;
+    const response = await result.response;
+    const text = response.text();
 
-    return text.length > 0 && text.length < originalTitle.length ? text : null
+    // Parse JSON
+    try {
+      const data = JSON.parse(text);
+      console.log("✅ Unified Data Extracted Successfully");
+      return data;
+    } catch (e) {
+      console.error("❌ Failed to parse JSON from AI response:", text);
+      return null;
+    }
+
   } catch (error) {
-    console.error('❌ FATAL: Error generating concise name:', error)
-    throw error // Exit script on failure as requested
+    console.error('❌ FATAL: Error in Unified Extraction:', error)
+    return null;
   }
 }
 
+// Keeping individual functions as legacy/fallbacks if needed,
+// strictly speaking they could be removed if we trust the unified one fully.
+// For now, I'll update generateReviewSummary to be exported just in case manual fallback is triggered elsewhere.
+
 /**
- * Use AI to generate a concise, attractive collection description
- * Removes social links, gear lists, and SEO fluff
+ * Legacy: Generate a concise 1-sentence review summary
  */
-async function generateConciseDescription(
-  originalDescription: string,
-  creatorName: string
+export async function generateReviewSummary(
+  notes: string,
+  creatorName: string,
+  restaurantName: string
 ): Promise<string | null> {
+  // ... (Existing implementation preserved for fallback)
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
 
   try {
     const { GoogleGenerativeAI } = await import('@google/generative-ai')
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
     const prompt = `
-    Summarize this YouTube video description into a engaging, concise description for a food collection.
+    Summarize the creator's opinion of this restaurant into a SINGLE, punchy sentence in Vietnamese.
 
     Creator: "${creatorName}"
-    Current Description:
-    "${originalDescription.substring(0, 5000)}" // Truncate to avoid token limits
+    Restaurant: "${restaurantName}"
+    Notes/Context: "${notes.substring(0, 500)}"
 
     Rules:
-    1. Remove all social media links, "Subscribe" requests, affiliate links, and gear lists.
-    2. Focus on the FOOD experience and the LOCATION. What is this collection about? (e.g., "A tour of the best Bánh Mì spots in Da Nang...").
-    3. Keep it to 2-3 engaging sentences.
-    4. Maintain the voice of the creator but make it cleaner.
-    5. Keep it in the ORIGINAL language (Vietnamese).
-    6. Return ONLY the new description.
+    1. EXTRACT the opinion about the FOOD/ATMOSPHERE only.
+    2. FORBIDDEN: Do not mention timestamps (e.g. "at 2:15"), do not say "check the video", do not mention "Authentik" or "Creator".
+    3. BAD EXAMPLE: "Xem video lúc 2:15 để biết..." (DELETE THIS).
+    4. GOOD EXAMPLE: "Bún chả cá ở đây nước dùng rất thanh và ngọt tự nhiên."
+    5. If no specific opinion is found, describe the dish neutrally based on the notes.
+    6. Keep it under 20 words.
+    7. MUST be in VIETNAMESE.
+    8. NO QUOTES in the output.
     `
 
-    // Simple retry logic
+    // Retry logic with backoff
     let result
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       try {
         result = await model.generateContent(prompt)
         break
       } catch (e: any) {
         if (e.message?.includes('429') || e.status === 429) {
-          if (i === 2) throw e
-          const waitTime = (i + 1) * 2000
+          if (i === 4) throw e
+          const waitTime = (i + 1) * 15000
+          console.log(`⏳ AI Rate limit hit (Review). Retrying in ${waitTime / 1000}s...`)
           await new Promise(resolve => setTimeout(resolve, waitTime))
         } else {
           throw e
@@ -625,7 +735,7 @@ async function generateConciseDescription(
     return response.text()?.trim().replace(/^["']|["']$/g, '') || null
 
   } catch (error) {
-    console.error('❌ FATAL: Error generating concise description:', error)
-    throw error // Exit script on failure as requested
+    console.error('❌ FATAL: Failed to generate review summary:', error)
+    return null
   }
 }

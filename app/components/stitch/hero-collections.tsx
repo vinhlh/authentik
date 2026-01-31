@@ -1,73 +1,67 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Collection } from "@/lib/supabase";
+import { useLanguage } from "@/lib/i18n-context";
+import { CollectionCard } from "./collection-card"; // Import the new card
 
 export interface HeroCollectionProps extends Collection {
   restaurant_count?: number;
 }
 
-const FALLBACK_COLLECTIONS = [
-  {
-    id: "1",
-    name: "Best Bánh Mì",
-    restaurant_count: 12,
-    source_url: "https://www.youtube.com/watch?v=placeholder",
-    // We'll simulate images for fallbacks below or handle in the render
-  },
-  // ... (keep other fallbacks if needed, simplified for brevity)
-];
-
-// Helper to get YouTube thumbnail
-function getYouTubeThumbnail(url: string | null) {
-  if (!url) return "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000";
-  const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
-  return videoId
-    ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-    : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000";
-}
+const FALLBACK_COLLECTIONS: HeroCollectionProps[] = [];
 
 export function HeroCollections({ collections }: { collections?: HeroCollectionProps[] }) {
-  const displayCollections = (collections && collections.length > 0) ? collections : FALLBACK_COLLECTIONS;
+  const { t } = useLanguage();
+  const displayCollections = collections || [];
+
+  if (displayCollections.length === 0) {
+    return (
+      <section className="mb-12">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <h2 className="text-3xl font-bold text-[#1c1917]">
+              {t('collections.title')}
+            </h2>
+            <p className="text-gray-500 mt-1">
+              {t('collections.subtitle')}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-gray-200">
+          <div className="w-16 h-16 bg-primary-light/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">{t('collections.empty.title')}</h3>
+          <p className="text-gray-500 max-w-md mx-auto mb-6">
+            {t('collections.empty.desc')}
+          </p>
+          <div className="inline-block bg-gray-900 text-white px-4 py-2 rounded-lg font-mono text-sm">
+            {t('collections.empty.cmd')}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-12">
       <div className="flex items-end justify-between mb-6">
         <div>
           <h2 className="text-3xl font-bold text-[#1c1917]">
-            Curated Collections
+            {t('collections.title')}
           </h2>
           <p className="text-gray-500 mt-1">
-            Hand-picked experiences by local food experts
+            {t('collections.subtitle')}
           </p>
         </div>
-        <Link
-          href="/collections"
-          className="text-primary font-semibold flex items-center gap-1 hover:underline"
-        >
-          View all <ArrowRight className="w-4 h-4" />
-        </Link>
       </div>
       <div className="masonry">
         {displayCollections.map((collection) => (
-          <div key={collection.id} className="masonry-item break-inside-avoid mb-6 group cursor-pointer">
-            <Link href={`/collections/${collection.id}`}>
-              <div className="relative aspect-[4/5] rounded-xl overflow-hidden mb-3 bg-gray-100">
-                <img
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  src={getYouTubeThumbnail(collection.source_url)}
-                  alt={collection.name}
-                />
-                <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div>
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-[#1c1917] leading-tight mb-1 group-hover:text-primary transition-colors">
-                  {collection.name}
-                </h3>
-                <p className="text-sm font-medium text-gray-500">
-                  {collection.restaurant_count || 0} Spots
-                </p>
-              </div>
-            </Link>
+          <div key={collection.id} className="masonry-item break-inside-avoid mb-6 h-full">
+            <CollectionCard collection={collection} />
           </div>
         ))}
       </div>

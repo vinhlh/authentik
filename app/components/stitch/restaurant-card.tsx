@@ -1,5 +1,9 @@
-import { Star } from "lucide-react";
+"use client";
+
+import { Star, Navigation } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n-context";
+import { calculateDistance } from "@/lib/utils/distance";
 
 export interface Restaurant {
   id: string;
@@ -15,36 +19,68 @@ export interface Restaurant {
     text: string;
     type: "local" | "trending" | "tourist";
   };
+  reviewSummary?: string;
+  reviewSummaryVi?: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
 }
 
-export function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
+export function RestaurantCard({
+  restaurant,
+  index,
+  userLocation,
+  isHovered,
+  onMouseEnter,
+  onMouseLeave
+}: {
+  restaurant: Restaurant;
+  index?: number;
+  userLocation?: { lat: number, lng: number };
+  isHovered?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+}) {
+  const { language, t } = useLanguage();
+
   const badgeColor =
     restaurant.badge?.type === "local"
       ? "bg-primary"
       : restaurant.badge?.type === "trending"
         ? "bg-[#1c1917]"
-        : "bg-primary"; // Default fallback, though HTML uses specific colors for badges.
+        : "bg-primary";
 
-  // HTML classes:
-  // Local Favorite: bg-primary (#db7706)
-  // Trending: bg-charcoal (#1c1917)
-  // Tourist Favorite: bg-primary (wait, HTML says "Tourist Favorite" is bg-primary too in one case, but logic usually differs. Let's follow HTML exactly per instance).
+  // Select summary based on language
+  const displayedSummary = language === 'vi'
+    ? (restaurant.reviewSummaryVi || restaurant.reviewSummary)
+    : (restaurant.reviewSummary || restaurant.reviewSummaryVi);
 
   return (
-    <div className="masonry-item break-inside-avoid mb-6">
+    <div
+      className="masonry-item break-inside-avoid mb-6"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <Link href={`/restaurants/${restaurant.id}`}>
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300 group cursor-pointer">
+        <div className={`bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-pointer ${isHovered ? 'ring-2 ring-primary scale-[1.02]' : ''}`}>
           <div className="relative">
             <img
               className="w-full h-auto object-cover"
               src={restaurant.image}
               alt={restaurant.alt}
             />
+            {/* Numbered badge */}
+            {index && (
+              <span className="absolute top-3 right-3 w-7 h-7 bg-white text-gray-800 text-sm font-bold rounded-full flex items-center justify-center shadow-md border border-gray-200">
+                {index}
+              </span>
+            )}
             {restaurant.badge && (
               <span
                 className={`absolute top-3 left-3 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${badgeColor}`}
               >
-                {restaurant.badge.text}
+                {t(restaurant.badge.text as any) || restaurant.badge.text}
               </span>
             )}
           </div>
@@ -61,10 +97,23 @@ export function RestaurantCard({ restaurant }: { restaurant: Restaurant }) {
             <p className="text-gray-500 text-sm mb-2">
               {restaurant.location} • {restaurant.cuisine}
             </p>
-            <div className="flex items-center gap-2">
+            {displayedSummary && (
+              <div className="mb-3 bg-primary-light/10 p-2.5 rounded-lg border border-primary-light/20">
+                <p className="text-sm text-gray-700 italic leading-relaxed">
+                  "{displayedSummary}"
+                </p>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
               <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">
-                {restaurant.price} • {restaurant.tags[0]}
+                {restaurant.price} • {t(restaurant.tags[0] as any) || restaurant.tags[0]}
               </span>
+              {userLocation && restaurant.coordinates && (
+                <span className="text-xs font-medium text-emerald-600 flex items-center gap-0.5">
+                  <Navigation className="w-3 h-3" />
+                  {calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)}
+                </span>
+              )}
             </div>
           </div>
         </div>

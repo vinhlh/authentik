@@ -1,15 +1,71 @@
 /**
  * Photo Download & AI Enhancement Pipeline
  * Downloads highlight food photos and enhances them using Gemini AI
+ * Uploads to Supabase Storage
  */
 
-import { mkdir, writeFile, readFile } from 'fs/promises'
+import { mkdir, writeFile, readFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import os from 'os'
+import { createClient } from '@supabase/supabase-js'
 import { PlaceDetails, selectBestPhotos, getPhotoUrl, EnhancedPhoto } from './api/google-places'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
+
+// Supabase Storage configuration
+// Supabase Storage configuration
+const STORAGE_BUCKET = 'Authentik Images'
+
+// Initialize Supabase client for storage operations
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Supabase URL and Key are required. Check your .env.local file.')
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
+
+/**
+ * Upload a file to Supabase Storage
+ * Returns the public URL
+ */
+async function uploadToStorage(
+  filePath: string,
+  storagePath: string
+): Promise<string | null> {
+  const supabase = getSupabaseClient()
+
+  try {
+    const fileBuffer = await readFile(filePath)
+
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, fileBuffer, {
+        contentType: 'image/jpeg',
+        upsert: true // Overwrite if exists
+      })
+
+    if (error) {
+      console.error(`   ❌ Upload failed: ${error.message}`)
+      return null
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(storagePath)
+
+    return urlData.publicUrl
+  } catch (err) {
+    console.error(`   ❌ Upload error:`, err)
+    return null
+  }
+}
 
 /**
  * Photo analysis result from Gemini Vision
@@ -392,9 +448,9 @@ export interface PhotoResult {
 
 /**
  * Process photos for a restaurant
- * 1. Downloads all photos (up to 10) as candidates
+ * 1. Downloads all photos (up to 10) as candidates to temp dir
  * 2. AI analyzes and selects best 3 food photos
- * 3. Enhances only the selected photos
+ * 3. Uploads selected photos to Supabase Storage
  */
 export async function processRestaurantPhotos(
   place: PlaceDetails,
@@ -410,10 +466,10 @@ export async function processRestaurantPhotos(
     return results
   }
 
-  // Create images directory in public folder
-  const imagesDir = path.join(process.cwd(), 'public', 'images', collectionSlug)
-  if (!existsSync(imagesDir)) {
-    await mkdir(imagesDir, { recursive: true })
+  // Use temp directory for downloads
+  const tempDir = path.join(os.tmpdir(), 'authentik-photos', collectionSlug)
+  if (!existsSync(tempDir)) {
+    await mkdir(tempDir, { recursive: true })
   }
 
   const shortId = getShortPlaceId(place.place_id)
@@ -421,17 +477,15 @@ export async function processRestaurantPhotos(
 
   console.log(`   📥 Downloading ${photosToDownload.length} candidate photos...`)
 
-  // Step 1: Download all candidate photos
+  // Step 1: Download all candidate photos to temp
   const downloaded: { path: string; index: number; analysis: PhotoAnalysis | null }[] = []
 
   for (let i = 0; i < photosToDownload.length; i++) {
     const photo = photosToDownload[i]
-    const candidateFilename = `${shortId}-candidate-${i + 1}.jpg`
-    const candidatePath = path.join(imagesDir, candidateFilename)
+    const candidateFilename = `${shortId}-${i + 1}.jpg`
+    const candidatePath = path.join(tempDir, candidateFilename)
 
     const url = getPhotoUrl(photo.photo_reference, 800)
-    // Only download if not exists or overwrite? For now assume download always needed or check exists
-    // Simplest: Check if exists to speed up skipped runs
     let success = false
     if (existsSync(candidatePath)) {
       success = true
@@ -447,15 +501,29 @@ export async function processRestaurantPhotos(
   console.log(`   ✅ Downloaded ${downloaded.length}/${photosToDownload.length} photos`)
 
   if (options.skipAI) {
-    console.log(`   ⏩ Skipping AI processing as requested`)
-    return downloaded.map(item => ({
-      originalPath: item.path,
-      enhancedPath: null,
-      category: 'unknown',
-      success: true,
-      isEnhanced: false,
-      webPath: `/images/${collectionSlug}/${path.basename(item.path)}`
-    }))
+    console.log(`   ⏩ Skipping AI, uploading top ${maxPhotos} to Storage...`)
+
+    // Upload the first N photos to Supabase Storage
+    const toUpload = downloaded.slice(0, maxPhotos)
+
+    for (const item of toUpload) {
+      const storagePath = `${collectionSlug}/${shortId}-${item.index}.jpg`
+      const publicUrl = await uploadToStorage(item.path, storagePath)
+
+      if (publicUrl) {
+        console.log(`   ☁️  Uploaded: ${storagePath}`)
+        results.push({
+          originalPath: item.path,
+          enhancedPath: null,
+          category: 'unknown',
+          success: true,
+          isEnhanced: false,
+          webPath: publicUrl
+        })
+      }
+    }
+
+    return results
   }
 
   // Step 2: AI analyze each photo (if API available)
@@ -492,7 +560,7 @@ export async function processRestaurantPhotos(
 
   console.log(`   🏆 Selected top ${selected.length} photos for enhancement`)
 
-  // Step 4: Enhance selected photos
+  // Step 4: Enhance selected photos and upload to Storage
   for (let i = 0; i < selected.length; i++) {
     const item = selected[i]
 
@@ -501,38 +569,52 @@ export async function processRestaurantPhotos(
     if (i > 0) await new Promise(r => setTimeout(r, 10000))
 
     const enhancedFilename = `${shortId}-enhanced-${item.index}.jpg`
-    const enhancedPath = path.join(imagesDir, enhancedFilename)
+    const enhancedPath = path.join(tempDir, enhancedFilename)
 
     console.log(`   ✨ Enhancing photo ${item.index}...`)
     try {
       await enhancePhotoWithAI(item.path, enhancedPath)
+
+      // Upload enhanced photo to Storage
+      const storagePath = `${collectionSlug}/${enhancedFilename}`
+      const publicUrl = await uploadToStorage(enhancedPath, storagePath)
+
+      if (publicUrl) {
+        console.log(`   ☁️  Uploaded enhanced: ${storagePath}`)
+        results.push({
+          originalPath: item.path,
+          enhancedPath,
+          category: item.analysis?.category === 'food_closeup' || item.analysis?.category === 'food_table'
+            ? 'food'
+            : item.analysis?.category === 'interior'
+              ? 'interior'
+              : item.analysis?.category === 'exterior'
+                ? 'exterior'
+                : 'unknown',
+          success: true,
+          isEnhanced: true,
+          webPath: publicUrl
+        })
+      }
     } catch (error) {
-      console.log(`   ⚠️ Enhancement failed (likely rate limit), skipping:`, error instanceof Error ? error.message : String(error))
+      console.log(`   ⚠️ Enhancement failed, uploading original:`, error instanceof Error ? error.message : String(error))
+
+      // Upload original as fallback
+      const storagePath = `${collectionSlug}/${shortId}-${item.index}.jpg`
+      const publicUrl = await uploadToStorage(item.path, storagePath)
+
+      if (publicUrl) {
+        console.log(`   ☁️  Uploaded original: ${storagePath}`)
+        results.push({
+          originalPath: item.path,
+          enhancedPath: null,
+          category: 'unknown',
+          success: true,
+          isEnhanced: false,
+          webPath: publicUrl
+        })
+      }
     }
-  }
-
-  // Build results for all downloaded photos
-  for (const item of downloaded) {
-    const isSelected = selectedPaths.has(item.path)
-    const expectedEnhancedPath = path.join(imagesDir, `${shortId}-enhanced-${item.index}.jpg`)
-    const enhancedExists = isSelected && existsSync(expectedEnhancedPath)
-
-    const enhancedPath = enhancedExists ? expectedEnhancedPath : null
-
-    results.push({
-      originalPath: item.path,
-      enhancedPath,
-      category: item.analysis?.category === 'food_closeup' || item.analysis?.category === 'food_table'
-        ? 'food'
-        : item.analysis?.category === 'interior'
-          ? 'interior'
-          : item.analysis?.category === 'exterior'
-            ? 'exterior'
-            : 'unknown',
-      success: true,
-      isEnhanced: isSelected,
-      webPath: `/images/${collectionSlug}/${path.basename(enhancedExists ? expectedEnhancedPath : item.path)}`
-    })
   }
 
   const enhancedCount = results.filter(r => r.isEnhanced).length
