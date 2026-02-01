@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Utensils, Quote, Star, Navigation } from "lucide-react";
+import { ArrowRight, Utensils, Quote, Star, Navigation, Heart } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { calculateDistance } from "@/lib/utils/distance";
+import { useAuth } from "@/lib/auth-context";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { LoginModal } from "@/components/auth/login-modal";
 
 export interface Restaurant {
   id: string;
@@ -45,6 +49,54 @@ export function RestaurantCard({
   collectionId?: string;
 }) {
   const { language, t } = useLanguage();
+  const { user } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkFavoriteStatus();
+    } else {
+      setIsFavorite(false);
+    }
+  }, [user, restaurant.id]);
+
+  const checkFavoriteStatus = async () => {
+    const { data } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_id', user!.id)
+      .eq('restaurant_id', restaurant.id)
+      .maybeSingle(); // Use maybeSingle to avoid 406 error if multiple rows (shouldn't happen with unique constraint) or 0 rows
+
+    setIsFavorite(!!data);
+  };
+
+  const toggleFavorite = async () => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
+    if (isFavorite) {
+      // Optimistic update
+      setIsFavorite(false);
+      await supabase
+        .from('favorites')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('restaurant_id', restaurant.id);
+    } else {
+      // Optimistic update
+      setIsFavorite(true);
+      await supabase
+        .from('favorites')
+        .insert({
+          user_id: user.id,
+          restaurant_id: restaurant.id
+        });
+    }
+  };
 
   const badgeColor =
     restaurant.badge?.type === "local"
@@ -65,7 +117,7 @@ export function RestaurantCard({
       onMouseLeave={onMouseLeave}
     >
       <Link href={`/restaurants/${restaurant.id}${collectionId ? `?collectionId=${collectionId}` : ''}`}>
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-pointer">
+        <div className="bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-default">
           <div className="relative overflow-hidden">
             <img
               className={`w-full h-auto object-cover transition-transform duration-300 ${isHovered ? 'scale-105' : ''}`}
@@ -89,7 +141,7 @@ export function RestaurantCard({
           <div className="p-4">
             <div className="mb-1">
               <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start">
-                <h3 className={`font-bold text-base lg:text-lg leading-tight transition-colors group-hover:text-primary ${isHovered ? 'text-primary' : ''}`}>
+                <h3 className={`font-bold text-base lg:text-lg leading-tight transition-colors group-hover:text-primary cursor-pointer ${isHovered ? 'text-primary' : ''}`}>
                   {restaurant.name}
                 </h3>
                 <div className="flex items-center gap-1 mt-1 lg:mt-0">
@@ -113,38 +165,57 @@ export function RestaurantCard({
               <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs w-fit">
                 {restaurant.price} • {t(restaurant.tags[0] as any) || restaurant.tags[0]}
               </span>
-              {restaurant.coordinates && (
+              <div className="flex items-center gap-2">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    window.open(
-                      `https://www.google.com/maps/dir/?api=1&destination=${restaurant.coordinates!.lat},${restaurant.coordinates!.lng}`,
-                      '_blank'
-                    );
+                    toggleFavorite();
                   }}
-                  className="group/btn flex items-center gap-1 px-2 py-1 bg-primary-light/20 border border-primary/30 rounded-full text-xs font-medium text-primary hover:bg-primary-light/40 hover:text-primary transition-colors cursor-pointer whitespace-nowrap w-fit"
+                  className={`group/fav w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${isFavorite
+                    ? 'bg-red-50 text-red-500 hover:bg-red-100'
+                    : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
+                    }`}
                 >
-                  <Navigation className="w-3.5 h-3.5" />
-                  {/* Mobile: Short version - just icon + distance */}
-                  <span className="lg:hidden">
-                    {userLocation
-                      ? calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)
-                      : 'Go'}
-                  </span>
-                  {/* Desktop: Show distance, swap to "Get Direction" on hover */}
-                  <span className="hidden lg:inline group-hover/btn:hidden">
-                    {userLocation
-                      ? calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)
-                      : 'Directions'}
-                  </span>
-                  <span className="hidden lg:group-hover/btn:inline">Get Direction</span>
+                  <Heart className={`w-4 h-4 transition-transform group-active/fav:scale-90 ${isFavorite ? 'fill-current' : ''}`} />
                 </button>
-              )}
+                {restaurant.coordinates && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${restaurant.coordinates!.lat},${restaurant.coordinates!.lng}`,
+                        '_blank'
+                      );
+                    }}
+                    className="group/btn flex items-center gap-1 px-2 py-1 bg-primary-light/20 border border-primary/30 rounded-full text-xs font-medium text-primary hover:bg-primary-light/40 hover:text-primary transition-colors cursor-pointer whitespace-nowrap w-fit"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    {/* Mobile: Short version - just icon + distance */}
+                    <span className="lg:hidden">
+                      {userLocation
+                        ? calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)
+                        : 'Go'}
+                    </span>
+                    {/* Desktop: Show distance, swap to "Get Direction" on hover */}
+                    <span className="hidden lg:inline group-hover/btn:hidden">
+                      {userLocation
+                        ? calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)
+                        : 'Directions'}
+                    </span>
+                    <span className="hidden lg:group-hover/btn:inline">Get Direction</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </Link>
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </div>
   );
 }

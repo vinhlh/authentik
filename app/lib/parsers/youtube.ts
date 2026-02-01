@@ -398,6 +398,7 @@ export async function extractRestaurantsFromTranscript(
     4. FILTER NON-REVIEWS: DO NOT extract a restaurant if the reviewer visited it but could not eat there (e.g., it was closed, sold out, too crowded) and therefore provided no opinion on the food.
     5. ABSENT DATA: If specific praise/criticism is missing but they DID eat there, leave the 'notes' field empty or use a brief factual statement.
     6. PRECISION: Be extremely precise with restaurant names.
+    7. AUTHENTIC VIETNAMESE ONLY: Strictly extract ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if они are located in Vietnam.
 
     Extract a JSON array of restaurants mentioned. Each object should have:
     - name: The name of the restaurant or food stall. Be precise.
@@ -574,6 +575,7 @@ export async function extractRestaurantsFromDescription(
     2. NO META-TALK: DO NOT use phrases like "safest bet", "likely", or "assuming".
     3. EXCLUDE CLOSED PLACES: If the description mentions a place was closed or they couldn't eat there, do not include it.
     4. FACTUAL ONLY: If the description doesn't explicitly describe the taste or experience, leave the 'notes' field empty or factual.
+    5. AUTHENTIC VIETNAMESE ONLY: Strictly extract ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if they are located in Vietnam.
 
     Analyze the following YouTube video title and description to extract ALL restaurants/food places mentioned.
     This is a Vietnamese food review video, so names may be in Vietnamese.

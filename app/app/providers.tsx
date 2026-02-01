@@ -4,6 +4,7 @@ import posthog from 'posthog-js'
 import { PostHogProvider } from 'posthog-js/react'
 import { usePathname, useSearchParams } from "next/navigation"
 import { useEffect, Suspense } from "react"
+import { AuthProvider } from "@/lib/auth-context"
 
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || '', {
@@ -39,7 +40,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <PostHogPageView />
       </Suspense>
-      {children}
+      <AuthProvider>
+        {children}
+      </AuthProvider>
     </PostHogProvider>
   )
 }

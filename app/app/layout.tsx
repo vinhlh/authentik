@@ -59,6 +59,8 @@ export const metadata: Metadata = {
 
 import { Providers } from "./providers";
 import { LanguageProvider } from "@/lib/i18n-context";
+import { LocationProvider } from "@/lib/location-context";
+import { FriendlyLocationRequest } from "@/components/stitch/friendly-location-request";
 
 export default function RootLayout({
   children,
@@ -69,13 +71,16 @@ export default function RootLayout({
     <html lang="en" className="light">
       <body className={`${inter.variable} font-sans antialiased bg-[#fafaf9] text-[#1c1917] min-h-screen`}>
         <LanguageProvider>
-          <Providers>
-            <div className="layout-container flex flex-col">
-              <Header />
-              {children}
-              <Footer />
-            </div>
-          </Providers>
+          <LocationProvider>
+            <Providers>
+              <div className="layout-container flex flex-col">
+                <Header />
+                {children}
+                <Footer />
+              </div>
+              <FriendlyLocationRequest />
+            </Providers>
+          </LocationProvider>
         </LanguageProvider>
       </body>
     </html>

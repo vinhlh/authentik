@@ -27,7 +27,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Configuration
 const CONFIG = {
   maxPhotosPerRestaurant: 3,
-  maxCandidatesPerRestaurant: 10,
+  maxCandidatesPerRestaurant: 20,
   delayBetweenRestaurantsMs: 3000,  // 3 seconds between restaurants
   delayBetweenCollectionsMs: 5000, // 5 seconds between collections
   skipAnalysis: false,     // ALWAYS analyze to prioritize food
@@ -91,7 +91,7 @@ async function getUnprocessedRestaurants(collectionId: string, collectionName: s
   const unprocessed: RestaurantToProcess[] = [];
 
   for (const link of links) {
-    const r = link.restaurant as any;
+    const r = link.restaurant as unknown as { id: string; name: string; google_place_id: string; images: string[] | null };
     if (!r || !r.google_place_id) continue;
 
     // Check if restaurant has no images or empty images array

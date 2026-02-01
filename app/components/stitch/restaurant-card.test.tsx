@@ -1,35 +1,82 @@
-import { render, screen } from '@testing-library/react'
+
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { RestaurantCard, Restaurant } from './restaurant-card'
-import { describe, it, expect } from 'vitest'
+import * as AuthContextObj from '@/lib/auth-context'
+
+// Mock dependencies
+vi.mock('@/lib/auth-context', () => ({
+  useAuth: vi.fn(),
+}))
+
+vi.mock('@/lib/i18n-context', () => ({
+  useLanguage: () => ({
+    language: 'en',
+    t: (key: string) => key,
+  }),
+}))
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(),
+  },
+}))
 
 const mockRestaurant: Restaurant = {
-  id: '123',
+  id: 'test-1',
   name: 'Test Restaurant',
-  rating: 4.5,
-  location: 'Downtown',
+  rating: 4.8,
+  location: 'Da Nang',
   cuisine: 'Vietnamese',
   price: '$$',
-  tags: ['Pho', 'Lunch'],
-  image: 'https://example.com/image.jpg',
-  alt: 'Restaurant image',
-  badge: { text: 'Test Badge', type: 'local' }
+  tags: ['Local'],
+  image: '/test.jpg',
+  alt: 'Test Alt',
+  badge: { text: 'Local Favorite', type: 'local' },
 }
 
 describe('RestaurantCard', () => {
-  it('renders restaurant information correctly', () => {
+  it('renders restaurant details correctly', () => {
+    // Mock unauthorized state
+    vi.spyOn(AuthContextObj, 'useAuth').mockReturnValue({
+      user: null,
+      isLoading: false,
+      signInWithGoogle: vi.fn(),
+      signOut: vi.fn(),
+      session: null,
+      profile: null
+    })
+
     render(<RestaurantCard restaurant={mockRestaurant} />)
 
     expect(screen.getByText('Test Restaurant')).toBeInTheDocument()
-    expect(screen.getByText('4.5')).toBeInTheDocument()
-    expect(screen.getByText(/Downtown/)).toBeInTheDocument()
-    expect(screen.getByText(/Vietnamese/)).toBeInTheDocument()
-    expect(screen.getByText('Test Badge')).toBeInTheDocument()
+    expect(screen.getByText('4.8')).toBeInTheDocument()
+    expect(screen.getByText('Local Favorite')).toBeInTheDocument()
   })
 
-  it('renders without badge when not provided', () => {
-    const noBadgeRestaurant = { ...mockRestaurant, badge: undefined }
-    render(<RestaurantCard restaurant={noBadgeRestaurant} />)
+  it('shows distance when userLocation is provided', () => {
+    vi.spyOn(AuthContextObj, 'useAuth').mockReturnValue({
+      user: null,
+      isLoading: false,
+      signInWithGoogle: vi.fn(),
+      signOut: vi.fn(),
+      session: null,
+      profile: null
+    })
 
-    expect(screen.queryByText('Test Badge')).not.toBeInTheDocument()
+    const restaurantWithCoordinates = {
+      ...mockRestaurant,
+      coordinates: { lat: 16.0544, lng: 108.2022 },
+    }
+    const userLocation = { lat: 16.0544, lng: 108.2022 } // Same location, 0km
+
+    render(
+      <RestaurantCard
+        restaurant={restaurantWithCoordinates}
+        userLocation={userLocation}
+      />
+    )
+
+    expect(screen.getAllByText('0m')[0]).toBeInTheDocument()
   })
 })

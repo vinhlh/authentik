@@ -18,8 +18,16 @@ async function main() {
   console.log(`Searching for: "${query}"...`)
 
 
+  interface Candidate {
+    score?: number;
+    title: string;
+    channelName: string;
+    url: string;
+    reason?: string;
+  }
+
   try {
-    let candidates: any[] = []
+    let candidates: Candidate[] = []
 
     if (query.includes('tiktok.com')) {
       // It's a TikTok channel URL

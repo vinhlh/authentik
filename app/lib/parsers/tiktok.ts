@@ -129,6 +129,7 @@ async function extractWithGemini(
   1. Identify any restaurants or food stalls mentioned or shown.
   2. Extract the name, approximate address, recommended dishes, and price estimation.
   3. Ignore non-food places.
+  4. AUTHENTIC VIETNAMESE ONLY: Strictly identify ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if they are located in Vietnam.
 
   Output ONLY valid JSON array with this structure:
   [

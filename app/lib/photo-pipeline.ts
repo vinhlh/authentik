@@ -120,6 +120,7 @@ export interface PhotoAnalysis {
   qualityScore: number   // 0-100: image quality (lighting, focus, composition)
   category: 'food_closeup' | 'food_table' | 'interior' | 'exterior' | 'other'
   description: string    // Brief description of what's in the photo
+  isAppealingSignature: boolean // true if this looks like a high-quality signature dish shot
 }
 
 /**
@@ -212,13 +213,15 @@ export async function analyzePhotoWithAI(imageBuffer: Buffer): Promise<PhotoAnal
           contents: [{
             parts: [
               {
-                text: `Analyze this restaurant photo. Respond ONLY with valid JSON:
+                text: `Analyze this restaurant photo. You are a food expert looking for the ONE most "signature" and visually stunning dish for a premium food app.
+Respond ONLY with valid JSON:
 {
   "isFood": boolean,        // true if photo shows food
-  "foodScore": number,      // 0-100: how appealing the food looks
-  "qualityScore": number,   // 0-100: image quality (lighting, focus)
+  "foodScore": number,      // 0-100: how appealing/delicious the food looks. Be strict: only 90+ for "Instagram-perfect" close-ups.
+  "qualityScore": number,   // 0-100: image quality (lighting, focus, background clarity)
   "category": "food_closeup" | "food_table" | "interior" | "exterior" | "other",
-  "description": "brief description"
+  "description": "brief description of the dish",
+  "isAppealingSignature": boolean // true if this looks like a high-quality signature dish shot
 }`
               },
               {
@@ -353,10 +356,10 @@ export async function selectBestPhotosWithAI(
     return selectBestPhotos(place, maxPhotos)
   }
 
-  console.log(`   🤖 AI analyzing ${Math.min(place.photos.length, 10)} photos...`)
+  console.log(`   🤖 AI analyzing ${Math.min(place.photos.length, 20)} photos...`)
 
-  // Analyze up to 10 photos (API cost consideration)
-  const photosToAnalyze = place.photos.slice(0, 10)
+  // Analyze up to 20 photos (Wider net for better quality)
+  const photosToAnalyze = place.photos.slice(0, 20)
   const analyzed: AnalyzedPhoto[] = []
 
   for (let i = 0; i < photosToAnalyze.length; i++) {
@@ -383,12 +386,21 @@ export async function selectBestPhotosWithAI(
     }
   }
 
-  // Sort by food score (food photos first), then by quality
+  // Sort by food score (food photos first), then by category (closeups), then by signature bonus, then by quality
   const sorted = analyzed
     .filter(p => p.analysis?.isFood === true)
     .sort((a, b) => {
-      const aScore = (a.analysis?.foodScore || 0) + (a.analysis?.qualityScore || 0)
-      const bScore = (b.analysis?.foodScore || 0) + (b.analysis?.qualityScore || 0)
+      const aAn = a.analysis!
+      const bAn = b.analysis!
+
+      const aScore = (aAn.category === 'food_closeup' ? 50 : 0) +
+        (aAn.isAppealingSignature ? 50 : 0) +
+        aAn.foodScore + aAn.qualityScore
+
+      const bScore = (bAn.category === 'food_closeup' ? 50 : 0) +
+        (bAn.isAppealingSignature ? 50 : 0) +
+        bAn.foodScore + bAn.qualityScore
+
       return bScore - aScore
     })
 
@@ -413,7 +425,10 @@ export async function selectBestPhotosWithAI(
         : p.analysis?.category === 'exterior'
           ? 'exterior' as const
           : 'unknown' as const,
-    score: (p.analysis?.foodScore || 0) + (p.analysis?.qualityScore || 0)
+    score: (p.analysis?.foodScore || 0) +
+      (p.analysis?.qualityScore || 0) +
+      (p.analysis?.category === 'food_closeup' ? 50 : 0) +
+      (p.analysis?.isAppealingSignature ? 50 : 0)
   }))
 }
 
@@ -504,7 +519,7 @@ export async function processRestaurantPhotos(
   place: PlaceDetails,
   collectionSlug: string,
   maxPhotos: number = 3,
-  maxCandidates: number = 10,
+  maxCandidates: number = 20,
   options: { skipAnalysis?: boolean; skipEnhancement?: boolean } = {}
 ): Promise<PhotoResult[]> {
   const results: PhotoResult[] = []
@@ -590,7 +605,11 @@ export async function processRestaurantPhotos(
     .map(item => ({
       ...item,
       score: item.analysis
-        ? (item.analysis.isFood ? 100 : 0) + item.analysis.foodScore + item.analysis.qualityScore
+        ? (item.analysis.isFood ? 100 : 0) +
+        (item.analysis.category === 'food_closeup' ? 50 : 0) +
+        (item.analysis.isAppealingSignature ? 50 : 0) +
+        item.analysis.foodScore +
+        item.analysis.qualityScore
         : 50 // Default score for unanalyzed
     }))
     .sort((a, b) => b.score - a.score)

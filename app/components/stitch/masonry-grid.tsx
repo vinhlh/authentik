@@ -1,3 +1,6 @@
+"use client";
+
+import { useLocation } from "@/lib/location-context";
 import { Restaurant, RestaurantCard } from "./restaurant-card";
 
 const FALLBACK_RESTAURANTS: Restaurant[] = [
@@ -30,23 +33,42 @@ const FALLBACK_RESTAURANTS: Restaurant[] = [
   // ... keep a few fallbacks
 ];
 
-export function MasonryGrid({ restaurants }: { restaurants?: Restaurant[] }) {
-  const displayRestaurants = (restaurants && restaurants.length > 0) ? restaurants : FALLBACK_RESTAURANTS;
+export function MasonryGrid({ restaurants, hasMore = false, disableFallback = false }: { restaurants?: Restaurant[], hasMore?: boolean, disableFallback?: boolean }) {
+  const { location } = useLocation();
+
+  let displayRestaurants: Restaurant[] = [];
+  if (restaurants && restaurants.length > 0) {
+    displayRestaurants = restaurants;
+  } else if (!disableFallback) {
+    displayRestaurants = FALLBACK_RESTAURANTS;
+  }
 
   return (
     <>
       <div className="masonry">
         {displayRestaurants.map((restaurant) => (
-          <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+          <RestaurantCard
+            key={restaurant.id}
+            restaurant={restaurant}
+            userLocation={location || undefined}
+          />
         ))}
       </div>
 
+      {displayRestaurants.length === 0 && (
+        <div className="text-center py-12 text-gray-500 italic">
+          No restaurants found.
+        </div>
+      )}
+
       {/* Load More */}
-      <div className="flex justify-center py-12">
-        <button className="px-8 py-3 rounded-xl border-2 border-[#1c1917]/10 font-bold hover:bg-[#1c1917] hover:text-white transition-all">
-          Show more spots
-        </button>
-      </div>
+      {hasMore && (
+        <div className="flex justify-center py-12">
+          <button className="px-8 py-3 rounded-xl border-2 border-[#1c1917]/10 font-bold hover:bg-[#1c1917] hover:text-white transition-all">
+            Show more spots
+          </button>
+        </div>
+      )}
     </>
   );
 }

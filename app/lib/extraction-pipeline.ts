@@ -641,6 +641,7 @@ ${listings}
     - VI summary must be in VIETNAMESE.
     - BANNED WORDS: Do NOT use "hấp dẫn", "ngon", "tuyệt vời", "đậm đà" universally. Use specific sensory words (e.g. "giòn rụm", "thanh ngọt", "béo ngậy", "thơm nức").
     - VARIETY: Ensure each review uses DIFFERENT adjectives.
+    - AUTHENTIC VIETNAMESE ONLY: Strictly include ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if they are featured in the video.
 
     Output JSON Schema:
     {

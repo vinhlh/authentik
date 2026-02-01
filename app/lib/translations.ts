@@ -44,6 +44,8 @@ export const TRANSLATIONS = {
     "signal.price": "Giá cả",
     "signal.location": "Vị trí",
     "signal.reputation": "Danh tiếng",
+    "header.nearYou": "Gần bạn",
+    "header.nearby": "Gần đây",
   },
   en: {
     "nav.home": "Home",
@@ -87,6 +89,8 @@ export const TRANSLATIONS = {
     "signal.price": "Price",
     "signal.location": "Location",
     "signal.reputation": "Reputation",
+    "header.nearYou": "Near You",
+    "header.nearby": "Nearby",
   }
 } as const;
 
