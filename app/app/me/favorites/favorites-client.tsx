@@ -3,12 +3,13 @@
 import { useAuth } from "@/lib/auth-context";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { MasonryGrid } from "@/components/stitch/masonry-grid";
+import { CollectionSection } from "@/components/stitch/collection-section";
 import { useLanguage } from "@/lib/i18n-context";
 import Link from "next/link";
 import { Heart, Share2, ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Restaurant } from "@/components/stitch/restaurant-card";
+import { parseWkbPoint } from "@/lib/utils/wkb-parser";
 
 export function FavoritesClient() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -70,10 +71,9 @@ export function FavoritesClient() {
           badge: badge,
           reviewSummary: r.ai_summary_en,
           reviewSummaryVi: r.ai_summary_vi,
-          coordinates: r.location?.coordinates ? {
-            lng: r.location.coordinates[0],
-            lat: r.location.coordinates[1]
-          } : undefined
+          reviewSummary: r.ai_summary_en,
+          reviewSummaryVi: r.ai_summary_vi,
+          coordinates: r.location ? parseWkbPoint(r.location) || undefined : undefined
         };
       }) as Restaurant[];
 
@@ -140,14 +140,14 @@ export function FavoritesClient() {
 
           <Button
             onClick={handleShare}
-            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm rounded-xl px-4 py-2 font-bold"
+            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm rounded-xl px-4 py-2 font-bold cursor-pointer"
           >
             <Share2 className="w-4 h-4" /> Share Collection
           </Button>
         </div>
 
         {restaurants.length > 0 ? (
-          <MasonryGrid restaurants={restaurants} />
+          <CollectionSection restaurants={restaurants} />
         ) : (
           <div className="text-center py-20 bg-gray-50 rounded-3xl border border-gray-100">
             <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />
