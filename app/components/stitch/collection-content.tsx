@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Restaurant, RestaurantCard } from "@/components/stitch/restaurant-card";
 import { CollectionMap } from "@/components/stitch/collection-map";
 import { CollectionHeader } from "@/components/stitch/collection-header";
+import { Map, X } from "lucide-react";
 
 interface CollectionContentProps {
   collection: any;
@@ -16,6 +17,7 @@ export function CollectionContent({ collection, restaurants, coverImage, coverIm
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [hoveredRestaurantId, setHoveredRestaurantId] = useState<string | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  const [showMobileMap, setShowMobileMap] = useState(true);
 
   // Request location permission on page load
   useEffect(() => {
@@ -60,9 +62,32 @@ export function CollectionContent({ collection, restaurants, coverImage, coverIm
       <CollectionHeader collection={collection} coverImage={coverImage} coverImageSrcSet={coverImageSrcSet} />
 
       <main className="max-w-[1400px] mx-auto px-6 py-8">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <span className="font-bold text-xl">{restaurants.length} Spots</span>
+          {/* Mobile map toggle */}
+          <button
+            onClick={() => setShowMobileMap(!showMobileMap)}
+            className="lg:hidden flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-full text-sm font-medium shadow-md"
+          >
+            <Map className="w-4 h-4" />
+            {showMobileMap ? 'Hide Map' : 'Show Map'}
+          </button>
         </div>
+
+        {/* Mobile map (collapsible) */}
+        {showMobileMap && (
+          <div className="lg:hidden mb-6 rounded-xl overflow-hidden shadow-lg">
+            <CollectionMap
+              restaurants={restaurants}
+              userLocation={userLocation}
+              onUserLocationUpdate={handleUserLocationUpdate}
+              hoveredRestaurantId={hoveredRestaurantId || selectedRestaurantId}
+              onHoverRestaurant={setHoveredRestaurantId}
+              onSelectRestaurant={handleSelectRestaurant}
+              showLabels={true}
+            />
+          </div>
+        )}
 
         {restaurants.length > 0 && (
           <div className="flex gap-8">
@@ -95,6 +120,7 @@ export function CollectionContent({ collection, restaurants, coverImage, coverIm
                   hoveredRestaurantId={hoveredRestaurantId || selectedRestaurantId}
                   onHoverRestaurant={setHoveredRestaurantId}
                   onSelectRestaurant={handleSelectRestaurant}
+                  showLabels={true}
                 />
               </div>
             </div>

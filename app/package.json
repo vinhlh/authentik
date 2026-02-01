@@ -12,6 +12,8 @@
     "extract:batch": "tsx workers/extract.ts batch",
     "discover": "tsx workers/discover.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "export-cookies": "tsx scripts/export-cookies.ts",
+    "generate-tokens": "tsx scripts/generate-youtube-tokens.ts",
     "test": "vitest"
   },
   "dependencies": {

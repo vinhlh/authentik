@@ -56,7 +56,7 @@ export function CollectionCard({ collection }: CollectionCardProps) {
 
         <div className="p-5 flex-1 flex flex-col justify-between">
           <div>
-            <h3 className="text-lg font-bold text-[#1c1917] leading-tight mb-2 group-hover:text-primary transition-colors line-clamp-2">
+            <h3 className="text-base md:text-lg font-bold text-[#1c1917] leading-tight mb-2 group-hover:text-primary transition-colors">
               {name}
             </h3>
           </div>

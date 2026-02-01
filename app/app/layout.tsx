@@ -40,6 +40,10 @@ export const metadata: Metadata = {
     creator: "@authentik",
     images: ["/og-image.jpg"],
   },
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
   robots: {
     index: true,
     follow: true,

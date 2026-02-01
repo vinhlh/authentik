@@ -16,14 +16,20 @@ export function Header() {
             <img
               src="/logo.png"
               alt="Authentik"
-              className="h-8 w-auto object-contain"
+              className="h-8 w-auto object-contain hidden md:block"
+            />
+            <img
+              src="/icon-mark.png"
+              alt="Authentik"
+              className="h-8 w-8 object-contain md:hidden"
             />
           </Link>
 
           {/* City Switcher */}
-          <div className="hidden md:flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 px-3 py-1.5 rounded-full cursor-pointer hover:border-primary hover:text-primary transition-colors">
+          <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 px-3 py-1.5 rounded-full cursor-pointer hover:border-primary hover:text-primary transition-colors">
             <MapPin className="w-4 h-4" />
-            <span>Da Nang</span>
+            <span className="md:hidden">DN</span>
+            <span className="hidden md:inline">Da Nang</span>
             <ChevronDown className="w-3 h-3 text-gray-400" />
           </div>
         </div>

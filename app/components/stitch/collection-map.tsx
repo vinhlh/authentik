@@ -19,9 +19,10 @@ interface CollectionMapProps {
   hoveredRestaurantId?: string | null;
   onHoverRestaurant?: (id: string | null) => void;
   onSelectRestaurant?: (id: string) => void;
+  showLabels?: boolean; // Show restaurant names on markers (for mobile)
 }
 
-export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate, hoveredRestaurantId, onHoverRestaurant, onSelectRestaurant }: CollectionMapProps) {
+export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate, hoveredRestaurantId, onHoverRestaurant, onSelectRestaurant, showLabels = false }: CollectionMapProps) {
   const { t } = useLanguage();
   const [viewState, setViewState] = useState({
     longitude: 108.2022, // Da Nang default
@@ -70,7 +71,7 @@ export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate,
       >
         <div
           className={`
-            cursor-pointer transform transition-all duration-200 relative
+            cursor-pointer transform transition-all duration-200 relative flex flex-col items-center
             ${isHovered ? 'scale-125 z-50' : 'hover:scale-110'}
           `}
           onMouseEnter={() => onHoverRestaurant?.(restaurant.id)}
@@ -88,13 +89,19 @@ export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate,
           <span className="absolute top-0 left-0 right-0 flex items-center justify-center text-white text-xs font-bold w-full h-[22px]" style={{ fontSize: '11px', marginTop: '1px' }}>
             {number}
           </span>
+          {/* Restaurant name label - only on mobile */}
+          {showLabels && (
+            <span className="mt-1 px-1.5 py-0.5 bg-white/90 backdrop-blur-sm text-[10px] font-medium text-gray-700 rounded shadow-sm text-center max-w-[100px] line-clamp-2 leading-tight">
+              {restaurant.name}
+            </span>
+          )}
         </div>
       </Marker>
     );
-  }), [restaurants, hoveredRestaurantId, onHoverRestaurant, onSelectRestaurant]);
+  }), [restaurants, hoveredRestaurantId, onHoverRestaurant, onSelectRestaurant, showLabels]);
 
   return (
-    <div className="h-[450px] w-full rounded-xl overflow-hidden border border-stone-200 relative">
+    <div className="h-[250px] lg:h-[450px] w-full rounded-xl overflow-hidden border border-stone-200 relative">
       <Map
         ref={mapRef}
         {...viewState}

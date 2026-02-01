@@ -169,50 +169,137 @@ export async function getVideoMetadata(
  * Note: This requires the youtube-transcript package
  */
 export async function getVideoTranscript(videoId: string): Promise<string | null> {
+  const { YoutubeTranscript } = await import('youtube-transcript')
+
   try {
-    const { YoutubeTranscript } = await import('youtube-transcript')
+    // 1. Fetch ALL available transcripts
+    /*
+       Note: fetchTranscript can take a config object.
+       Use a dummy request first or just try to get the default to see what happens?
+       Actually, youtube-transcript doesn't expose list easily without a workaround or just trying.
 
-    // We cannot assume the language, but youtube-transcript tries to find "en" or auto-generated
-    // We might need to fetch available transcripts first if we want specific languages like "vi"
-    // For now, let's try default behavior which usually grabs auto-generated or English
+       Wait, the library documentation says we can just try, or use a separate internal method if exposed.
+       But standard usage is just calling it.
 
-    // Try to get transcript (default)
-    console.log(`   Trying to fetch transcript for ${videoId}...`)
+       Let's try a waterfall approach which is most reliable with this specific library:
+    */
+
+    // Attempt 1: Explicit Vietnamese (Manual or Auto)
     try {
-      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
-      if (transcriptItems && transcriptItems.length > 0) {
-        console.log(`   ✅ Found transcript (${transcriptItems.length} lines)`)
-        return transcriptItems.map(t => t.text).join(' ')
+      const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi' })
+      if (items.length > 0) {
+        console.log(`   ✅ Found 'vi' transcript (${items.length} lines)`)
+        return items.map(t => t.text).join(' ')
+      }
+    } catch (e) { }
+
+    // Attempt 2: Explicit Vietnamese (Auto-generated code often)
+    try {
+      const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi-VN' })
+      if (items.length > 0) {
+        console.log(`   ✅ Found 'vi-VN' transcript (${items.length} lines)`)
+        return items.map(t => t.text).join(' ')
+      }
+    } catch (e) { }
+
+    // Attempt 3: Default (usually English or 'Auto' based on server region)
+    try {
+      const items = await YoutubeTranscript.fetchTranscript(videoId)
+      if (items.length > 0) {
+        console.log(`   ✅ Found default transcript (${items.length} lines)`)
+        return items.map(t => t.text).join(' ')
       }
     } catch (e) {
-      console.log(`   Default transcript fetch failed. Trying 'vi'...`)
+      console.warn(`   ⚠️ No default transcript found: ${e}`)
     }
 
-    // Fallback: Try Vietnamese explicitly
-    try {
-      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi' })
-      if (transcriptItems && transcriptItems.length > 0) {
-        console.log(`   ✅ Found VIETNAMESE transcript (${transcriptItems.length} lines)`)
-        return transcriptItems.map(t => t.text).join(' ')
-      }
-    } catch (e) {
-      // Ignore
-    }
-
-    // Fallback: Try Auto-generated Vietnamese
-    try {
-      const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi-VN' })
-      if (transcriptItems && transcriptItems.length > 0) {
-        console.log(`   ✅ Found VI-VN transcript`)
-        return transcriptItems.map(t => t.text).join(' ')
-      }
-    } catch (e) {
-      console.warn('   ❌ Transcript fetch error:', e)
-    }
-
-    return null
+    // Final Fallback: Attempt a raw fetch if the library keeps returning empty
+    console.log(`   🔄 Attempting raw transcript fetch fallback...`)
+    return await rawTranscriptFetch(videoId)
   } catch (error) {
     console.error('Error fetching transcript:', error)
+    return null
+  }
+}
+
+/**
+ * Low-level raw fetch for transcripts when the library fails
+ */
+async function rawTranscriptFetch(videoId: string): Promise<string | null> {
+  try {
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
+
+    // Attempt to load cookies from file if it exists
+    const cookieHeader = getCookieHeaderFromFile()
+    const headers: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7'
+    }
+    if (cookieHeader) headers['Cookie'] = cookieHeader
+
+    const response = await fetch(videoUrl, { headers })
+    const html = await response.text()
+
+    // Try to find the innerTube caption data in the HTML
+    const match = html.match(/"captions":\s*({[\s\S]+?}),/)
+    if (!match) return null
+
+    const captions = JSON.parse(match[1])
+    const tracks = captions?.playerCaptionsTracklistRenderer?.captionTracks
+    if (!tracks || tracks.length === 0) return null
+
+    // Find Vietnamese track or first available
+    const viTrack = tracks.find((t: any) => t.languageCode === 'vi') || tracks[0]
+    const trackResponse = await fetch(viTrack.baseUrl)
+    const xml = await trackResponse.text()
+
+    // Simple XML text extraction (regex for simplicity)
+    const textMatches = xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g)
+    const texts = Array.from(textMatches).map(m => m[1]
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+    )
+
+    if (texts.length > 0) {
+      console.log(`   ✅ Raw Fetch Success! (${texts.length} items)`)
+      return texts.join(' ')
+    }
+    return null
+  } catch (e) {
+    console.warn(`⚠️ Raw fetch failed:`, e)
+    return null
+  }
+}
+
+/**
+ * Simple parser for Netscape/yt-dlp cookie files
+ */
+function getCookieHeaderFromFile(): string | null {
+  const cookieFile = process.env.YOUTUBE_COOKIES_FILE || 'youtube-cookies.txt'
+  const filePath = path.join(process.cwd(), cookieFile)
+
+  if (!fs.existsSync(filePath)) return null
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8')
+    const lines = content.split('\n')
+    const cookies: string[] = []
+
+    for (const line of lines) {
+      if (line.startsWith('#') || !line.trim()) continue
+      const parts = line.split('\t')
+      if (parts.length >= 7) {
+        const name = parts[5]
+        const value = parts[6].trim()
+        cookies.push(`${name}=${value}`)
+      }
+    }
+    return cookies.length > 0 ? cookies.join('; ') : null
+  } catch (e) {
+    console.warn(`⚠️ Failed to parse cookie file:`, e)
     return null
   }
 }
@@ -231,11 +318,30 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
   const tempFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.m4a`)
 
   try {
-    // 1. Download Audio (using tv_embedded client which bypasses PO Token)
-    await execAsync(`yt-dlp -f "bestaudio[ext=m4a]" --extractor-args "youtube:player_client=tv_embedded" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`)
+    // 1. Download Audio using iOS client
+    // Note: ios client is currently the most reliable for bypassing 403s
+    console.log(`   📡 Attempting download with ios client...`)
+
+    let cookiesFlag = ''
+    if (process.env.YOUTUBE_COOKIES_FILE) {
+      console.log(`   🍪 Using cookies from file: ${process.env.YOUTUBE_COOKIES_FILE}`)
+      cookiesFlag = `--cookies ${process.env.YOUTUBE_COOKIES_FILE}`
+    } else if (process.env.YOUTUBE_COOKIES_BROWSER) {
+      console.log(`   🍪 Using cookies from browser: ${process.env.YOUTUBE_COOKIES_BROWSER}`)
+      cookiesFlag = `--cookies-from-browser ${process.env.YOUTUBE_COOKIES_BROWSER}`
+    }
+
+    let extractorArgsStr = 'youtube:player_client=ios'
+    if (process.env.YOUTUBE_PO_TOKEN && process.env.YOUTUBE_VISITOR_DATA) {
+      console.log(`   🛡️  Using explicit PO Token and Visitor Data`)
+      extractorArgsStr += `;po_token=${process.env.YOUTUBE_PO_TOKEN};visitor_data=${process.env.YOUTUBE_VISITOR_DATA}`
+    }
+
+    const cmd = `yt-dlp ${cookiesFlag} -f "bestaudio[ext=m4a]" --extractor-args "${extractorArgsStr}" --user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`
+    await execAsync(cmd)
 
     if (!fs.existsSync(tempFile)) {
-      throw new Error('Audio download failed')
+      throw new Error('Audio download failed (file not found)')
     }
 
     // 2. Upload to Gemini
@@ -364,7 +470,6 @@ export async function extractRestaurantsFromTranscript(
     console.error('Error during AI extraction:', error)
     return []
   }
-  return []
 }
 
 
@@ -561,8 +666,6 @@ export async function parseYouTubeVideo(url: string): Promise<{
     throw new Error('❌ Could not fetch video metadata. Check YOUTUBE_API_KEY.')
   }
 
-  // Get transcript
-  console.log(`fetching transcript for video: ${videoId}`)
   // Get transcript
   console.log(`fetching transcript for video: ${videoId}`)
   let transcript = await getVideoTranscript(videoId)

@@ -65,10 +65,10 @@ export function RestaurantCard({
       onMouseLeave={onMouseLeave}
     >
       <Link href={`/restaurants/${restaurant.id}${collectionId ? `?collectionId=${collectionId}` : ''}`}>
-        <div className={`bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-pointer ${isHovered ? 'ring-2 ring-primary scale-[1.02]' : ''}`}>
-          <div className="relative">
+        <div className="bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-pointer">
+          <div className="relative overflow-hidden">
             <img
-              className="w-full h-auto object-cover"
+              className={`w-full h-auto object-cover transition-transform duration-300 ${isHovered ? 'scale-105' : ''}`}
               src={restaurant.image}
               alt={restaurant.alt}
             />
@@ -87,13 +87,15 @@ export function RestaurantCard({
             )}
           </div>
           <div className="p-4">
-            <div className="flex justify-between items-start mb-1">
-              <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors">
-                {restaurant.name}
-              </h3>
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 fill-primary text-primary" />
-                <span className="text-sm font-bold">{restaurant.rating}</span>
+            <div className="mb-1">
+              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start">
+                <h3 className={`font-bold text-base lg:text-lg leading-tight transition-colors group-hover:text-primary ${isHovered ? 'text-primary' : ''}`}>
+                  {restaurant.name}
+                </h3>
+                <div className="flex items-center gap-1 mt-1 lg:mt-0">
+                  <Star className="w-4 h-4 fill-primary text-primary" />
+                  <span className="text-sm font-bold">{restaurant.rating}</span>
+                </div>
               </div>
             </div>
             <p className="text-gray-500 text-sm mb-2">
@@ -107,15 +109,37 @@ export function RestaurantCard({
                 </p>
               </div>
             )}
-            <div className="flex items-center justify-between gap-2">
-              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs w-fit">
                 {restaurant.price} • {t(restaurant.tags[0] as any) || restaurant.tags[0]}
               </span>
-              {userLocation && restaurant.coordinates && (
-                <span className="text-xs font-medium text-emerald-600 flex items-center gap-0.5">
-                  <Navigation className="w-3 h-3" />
-                  {calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)}
-                </span>
+              {restaurant.coordinates && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(
+                      `https://www.google.com/maps/dir/?api=1&destination=${restaurant.coordinates!.lat},${restaurant.coordinates!.lng}`,
+                      '_blank'
+                    );
+                  }}
+                  className="group/btn flex items-center gap-1 px-2 py-1 bg-primary-light/20 border border-primary/30 rounded-full text-xs font-medium text-primary hover:bg-primary-light/40 hover:text-primary transition-colors cursor-pointer whitespace-nowrap w-fit"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  {/* Mobile: Short version - just icon + distance */}
+                  <span className="lg:hidden">
+                    {userLocation
+                      ? calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)
+                      : 'Go'}
+                  </span>
+                  {/* Desktop: Show distance, swap to "Get Direction" on hover */}
+                  <span className="hidden lg:inline group-hover/btn:hidden">
+                    {userLocation
+                      ? calculateDistance(userLocation.lat, userLocation.lng, restaurant.coordinates.lat, restaurant.coordinates.lng)
+                      : 'Directions'}
+                  </span>
+                  <span className="hidden lg:group-hover/btn:inline">Get Direction</span>
+                </button>
               )}
             </div>
           </div>
