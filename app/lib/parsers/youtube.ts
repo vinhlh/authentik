@@ -224,85 +224,73 @@ export async function getVideoTranscript(videoId: string): Promise<string | null
 
 /**
  * Low-level raw fetch for transcripts when the library fails
+ * Uses yt-dlp to extract auto-generated or manual subtitles
  */
 async function rawTranscriptFetch(videoId: string): Promise<string | null> {
-  try {
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
-
-    // Attempt to load cookies from file if it exists
-    const cookieHeader = getCookieHeaderFromFile()
-    const headers: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7'
-    }
-    if (cookieHeader) headers['Cookie'] = cookieHeader
-
-    const response = await fetch(videoUrl, { headers })
-    const html = await response.text()
-
-    // Try to find the innerTube caption data in the HTML
-    const match = html.match(/"captions":\s*({[\s\S]+?}),/)
-    if (!match) return null
-
-    const captions = JSON.parse(match[1])
-    const tracks = captions?.playerCaptionsTracklistRenderer?.captionTracks
-    if (!tracks || tracks.length === 0) return null
-
-    // Find Vietnamese track or first available
-    const viTrack = tracks.find((t: any) => t.languageCode === 'vi') || tracks[0]
-    const trackResponse = await fetch(viTrack.baseUrl)
-    const xml = await trackResponse.text()
-
-    // Simple XML text extraction (regex for simplicity)
-    const textMatches = xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g)
-    const texts = Array.from(textMatches).map(m => m[1]
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-    )
-
-    if (texts.length > 0) {
-      console.log(`   ✅ Raw Fetch Success! (${texts.length} items)`)
-      return texts.join(' ')
-    }
-    return null
-  } catch (e) {
-    console.warn(`⚠️ Raw fetch failed:`, e)
-    return null
-  }
-}
-
-/**
- * Simple parser for Netscape/yt-dlp cookie files
- */
-function getCookieHeaderFromFile(): string | null {
-  const cookieFile = process.env.YOUTUBE_COOKIES_FILE || 'youtube-cookies.txt'
-  const filePath = path.join(process.cwd(), cookieFile)
-
-  if (!fs.existsSync(filePath)) return null
+  const tempDir = os.tmpdir()
+  const vttFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.vi.vtt`)
 
   try {
-    const content = fs.readFileSync(filePath, 'utf8')
+    console.log(`   📡 Attempting transcript fetch via yt-dlp...`)
+
+    const cookiesFlag = '--cookies-from-browser chrome'
+    console.log(`   🍪 Using cookies from browser: chrome`)
+
+    const cmd = `yt-dlp ${cookiesFlag} --skip-download --write-subs --write-auto-subs --sub-langs "vi,vi-VN,en.*" -o "${tempDir}/yt-${videoId}-${Date.now()}" "https://www.youtube.com/watch?v=${videoId}"`
+
+    await execAsync(cmd)
+
+    // yt-dlp names the file with the language suffix
+    const files = fs.readdirSync(tempDir).filter(f => f.startsWith(`yt-${videoId}`) && f.endsWith('.vtt'))
+
+    if (files.length === 0) {
+      console.warn(`   ⚠️ No VTT files found after yt-dlp execution`)
+      return null
+    }
+
+    // Sort to pick 'vi' first if multiple exist
+    files.sort((a, b) => {
+      if (a.includes('.vi.')) return -1
+      if (b.includes('.vi.')) return 1
+      return 0
+    })
+
+    const vttPath = path.join(tempDir, files[0])
+    const content = fs.readFileSync(vttPath, 'utf8')
+
+    // Clean up all generated VTT files
+    files.forEach(f => {
+      try { fs.unlinkSync(path.join(tempDir, f)) } catch { }
+    })
+
+    // Simple VTT parsing: extract text lines
+    // Standard VTT format has timestamps followed by text
     const lines = content.split('\n')
-    const cookies: string[] = []
+      .filter(line => !line.includes('-->') && line.trim() !== '' && !line.startsWith('WEBVTT') && !line.startsWith('Kind:') && !line.startsWith('Language:'))
+      .map(line => line.replace(/<[^>]*>/g, '').trim()) // Remove VTT tags like <c.color>
+      .filter(line => line.length > 0)
 
-    for (const line of lines) {
-      if (line.startsWith('#') || !line.trim()) continue
-      const parts = line.split('\t')
-      if (parts.length >= 7) {
-        const name = parts[5]
-        const value = parts[6].trim()
-        cookies.push(`${name}=${value}`)
+    // Deduplicate consecutive identical lines (common in auto-subs)
+    const uniqueLines: string[] = []
+    for (let i = 0; i < lines.length; i++) {
+      if (i === 0 || lines[i] !== lines[i - 1]) {
+        uniqueLines.push(lines[i])
       }
     }
-    return cookies.length > 0 ? cookies.join('; ') : null
+
+    const transcript = uniqueLines.join(' ')
+    if (transcript.length > 0) {
+      console.log(`   ✅ yt-dlp Fetch Success! (${transcript.length} chars)`)
+      return transcript
+    }
+
+    return null
   } catch (e) {
-    console.warn(`⚠️ Failed to parse cookie file:`, e)
+    console.warn(`⚠️ yt-dlp transcript fetch failed:`, e)
     return null
   }
 }
+
 
 /**
  * Transcribe audio from YouTube video using Gemini
@@ -322,22 +310,10 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
     // Note: ios client is currently the most reliable for bypassing 403s
     console.log(`   📡 Attempting download with ios client...`)
 
-    let cookiesFlag = ''
-    if (process.env.YOUTUBE_COOKIES_FILE) {
-      console.log(`   🍪 Using cookies from file: ${process.env.YOUTUBE_COOKIES_FILE}`)
-      cookiesFlag = `--cookies ${process.env.YOUTUBE_COOKIES_FILE}`
-    } else if (process.env.YOUTUBE_COOKIES_BROWSER) {
-      console.log(`   🍪 Using cookies from browser: ${process.env.YOUTUBE_COOKIES_BROWSER}`)
-      cookiesFlag = `--cookies-from-browser ${process.env.YOUTUBE_COOKIES_BROWSER}`
-    }
+    const cookiesFlag = '--cookies-from-browser chrome'
+    console.log(`   🍪 Using cookies from browser: chrome`)
 
-    let extractorArgsStr = 'youtube:player_client=ios'
-    if (process.env.YOUTUBE_PO_TOKEN && process.env.YOUTUBE_VISITOR_DATA) {
-      console.log(`   🛡️  Using explicit PO Token and Visitor Data`)
-      extractorArgsStr += `;po_token=${process.env.YOUTUBE_PO_TOKEN};visitor_data=${process.env.YOUTUBE_VISITOR_DATA}`
-    }
-
-    const cmd = `yt-dlp ${cookiesFlag} -f "bestaudio[ext=m4a]" --extractor-args "${extractorArgsStr}" --user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`
+    const cmd = `yt-dlp ${cookiesFlag} -f "bestaudio[ext=m4a]" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`
     await execAsync(cmd)
 
     if (!fs.existsSync(tempFile)) {
@@ -415,12 +391,20 @@ export async function extractRestaurantsFromTranscript(
 
     Target: Vietnamese food review video in Da Nang or Vietnam.
 
+    CRITICAL RULES:
+    1. STRICT FACTUAL EXTRACTION: ONLY extract information EXPLICITLY mentioned in the transcript or title/description.
+    2. NO SPECULATION: DO NOT hallucinate, assume, or guess details not present in the text.
+    3. NO META-TALK: DO NOT include reasoning like "Assuming the video at X:XX depicts..." or "Without access to the video...". The 'notes' field should contain ONLY details about the restaurant/food.
+    4. FILTER NON-REVIEWS: DO NOT extract a restaurant if the reviewer visited it but could not eat there (e.g., it was closed, sold out, too crowded) and therefore provided no opinion on the food.
+    5. ABSENT DATA: If specific praise/criticism is missing but they DID eat there, leave the 'notes' field empty or use a brief factual statement.
+    6. PRECISION: Be extremely precise with restaurant names.
+
     Extract a JSON array of restaurants mentioned. Each object should have:
     - name: The name of the restaurant or food stall. Be precise.
     - address: The address if mentioned (or "Da Nang" if inferred but not specific).
-    - dishes: Array of dishes recommended or eaten there.
-    - priceRange: Estimation based on context ("$" = cheap street food, "$$" = casual, "$$$" = upscale).
-    - notes: Detailed summary of the reviewer's experience. Include atmosphere, specific praise/criticism of food, and why they recommend it. Combine insights from both video description and transcript.
+    - dishes: Array of dishes explicitly recommended or eaten there.
+    - priceRange: Estimation based ONLY on context ("$" = cheap street food, "$$" = casual, "$$$" = upscale).
+    - notes: Detailed summary of the reviewer's actual experience found in the text. Include atmosphere, specific praise/criticism of food, and why they recommend it.
     - timestamp: Approximate timestamp in seconds where it appears (estimate based on text position if possible, otherwise 0).
 
     Return ONLY the JSON array. If no restaurants are clearly identified, return empty array [].
@@ -429,7 +413,7 @@ export async function extractRestaurantsFromTranscript(
     Channel: ${videoMetadata.channelName}
     Video Description: ${videoMetadata.description}
     Transcript:
-    ${transcript.substring(0, 50000)} // Truncate to avoid token limits if extremely long
+    ${transcript.substring(0, 50000)}
     `
 
     const result = await model.generateContent(prompt)
@@ -585,6 +569,12 @@ export async function extractRestaurantsFromDescription(
     const prompt = `
     You are an expert at extracting restaurant information from YouTube video descriptions.
 
+    CRITICAL RULES:
+    1. NO ASSUMPTIONS: DO NOT guess what happens in the video. ONLY use the provided text.
+    2. NO META-TALK: DO NOT use phrases like "safest bet", "likely", or "assuming".
+    3. EXCLUDE CLOSED PLACES: If the description mentions a place was closed or they couldn't eat there, do not include it.
+    4. FACTUAL ONLY: If the description doesn't explicitly describe the taste or experience, leave the 'notes' field empty or factual.
+
     Analyze the following YouTube video title and description to extract ALL restaurants/food places mentioned.
     This is a Vietnamese food review video, so names may be in Vietnamese.
 
@@ -596,9 +586,9 @@ export async function extractRestaurantsFromDescription(
     Extract a JSON array where each object has:
     - name: The exact name of the restaurant/food stall (e.g., "Mỳ Quảng Nhung", "Bún cá 109")
     - address: "Da Nang" (since this is a Da Nang food tour)
-    - dishes: Infer the main dish from the name if possible (e.g., "Mỳ Quảng" for "Mỳ Quảng Nhung", "Bún cá" for "Bún cá 109")
+    - dishes: Infer the main dish from the name if possible (e.g., "Mỳ Quảng" for "Mỳ Quảng Nhung").
     - priceRange: "$" for street food (default assumption for these types of videos)
-    - notes: Brief note about what type of food they serve
+    - notes: Brief factual note about what type of food they serve.
     - timestamp: Convert timestamp to seconds if available (e.g., "2:15" = 135)
 
     Return ONLY the JSON array. If no restaurants are identified, return [].
