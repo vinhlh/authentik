@@ -21,7 +21,7 @@ export default async function HomePage() {
       collections = collectionsData.map((item: any) => ({
         ...item,
         restaurant_count: item.collection_restaurants?.[0]?.count || 0
-      }));
+      })).filter((item: any) => item.restaurant_count > 1);
     }
 
     // Fetch Restaurants
