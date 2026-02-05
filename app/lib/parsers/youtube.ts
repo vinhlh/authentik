@@ -224,24 +224,58 @@ export async function getVideoTranscript(videoId: string): Promise<string | null
 
 /**
  * Low-level raw fetch for transcripts when the library fails
- * Uses yt-dlp to extract auto-generated or manual subtitles
+ * Uses yt-dlp via youtube-dl-exec to extract auto-generated or manual subtitles
  */
 async function rawTranscriptFetch(videoId: string): Promise<string | null> {
   const tempDir = os.tmpdir()
-  const vttFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.vi.vtt`)
+  const youtubedl = (await import('youtube-dl-exec')).default
 
   try {
     console.log(`   📡 Attempting transcript fetch via yt-dlp...`)
 
-    const cookiesFlag = '--cookies-from-browser chrome'
-    console.log(`   🍪 Using cookies from browser: chrome`)
+    // We use the library to handle the binary execution
+    // Flags mapping:
+    // --skip-download -> skipDownload: true
+    // --write-subs -> writeSubs: true
+    // --write-auto-subs -> writeAutoSubs: true
+    // --sub-langs -> subLangs: ...
 
-    const cmd = `yt-dlp ${cookiesFlag} --skip-download --write-subs --write-auto-subs --sub-langs "vi,vi-VN,en.*" -o "${tempDir}/yt-${videoId}-${Date.now()}" "https://www.youtube.com/watch?v=${videoId}"`
+    // Note: youtube-dl-exec returns a promise that resolves to the output,
+    // but for file writing flags it might just write files.
 
-    await execAsync(cmd)
+    const outputTemplate = `${tempDir}/yt-${videoId}-${Date.now()}`
+
+    // Force YOUTUBE_DL_DIR to point to the local node_modules bin
+    // This fixes the /ROOT/ path issue on some serverless environments
+    const localBinDir = path.resolve(process.cwd(), 'node_modules/youtube-dl-exec/bin');
+    if (fs.existsSync(localBinDir)) {
+      process.env.YOUTUBE_DL_DIR = localBinDir;
+    }
+
+    await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+      skipDownload: true,
+      writeSub: true,
+      writeAutoSub: true,
+      subLangs: 'vi,vi-VN,en.*',
+      output: outputTemplate,
+      cookiesFromBrowser: 'chrome',
+      noCheckCertificates: true,
+      noWarnings: true,
+      preferFreeFormats: true,
+      addHeader: [
+        'referer:youtube.com',
+      ]
+    }, {
+      cwd: process.cwd()
+    } as any)
 
     // yt-dlp names the file with the language suffix
-    const files = fs.readdirSync(tempDir).filter(f => f.startsWith(`yt-${videoId}`) && f.endsWith('.vtt'))
+    // We search for files starting with the base name we provided (but youtube-dl-exec might append params)
+    // Actually output template handles it.
+
+    // Check for generated VTT files
+    const baseName = path.basename(outputTemplate)
+    const files = fs.readdirSync(tempDir).filter(f => f.startsWith(baseName) && f.endsWith('.vtt'))
 
     if (files.length === 0) {
       console.warn(`   ⚠️ No VTT files found after yt-dlp execution`)
@@ -285,8 +319,8 @@ async function rawTranscriptFetch(videoId: string): Promise<string | null> {
     }
 
     return null
-  } catch (e) {
-    console.warn(`⚠️ yt-dlp transcript fetch failed:`, e)
+  } catch (e: any) {
+    console.warn(`⚠️ yt-dlp transcript fetch failed:`, e.message || e)
     return null
   }
 }
@@ -304,17 +338,19 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
 
   const tempDir = os.tmpdir()
   const tempFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.m4a`)
+  const youtubedl = (await import('youtube-dl-exec')).default
 
   try {
-    // 1. Download Audio using iOS client
-    // Note: ios client is currently the most reliable for bypassing 403s
-    console.log(`   📡 Attempting download with ios client...`)
+    // 1. Download Audio
+    console.log(`   📡 Attempting download...`)
 
-    const cookiesFlag = '--cookies-from-browser chrome'
-    console.log(`   🍪 Using cookies from browser: chrome`)
-
-    const cmd = `yt-dlp ${cookiesFlag} -f "bestaudio[ext=m4a]" -o "${tempFile}" "https://www.youtube.com/watch?v=${videoId}"`
-    await execAsync(cmd)
+    await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+      format: 'bestaudio[ext=m4a]',
+      output: tempFile,
+      cookiesFromBrowser: 'chrome',
+      noCheckCertificates: true,
+      noWarnings: true,
+    } as any) // Cast to any for cookiesFromBrowser
 
     if (!fs.existsSync(tempFile)) {
       throw new Error('Audio download failed (file not found)')

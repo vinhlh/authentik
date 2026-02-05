@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, ChevronDown, Heart, LogIn, LogOut } from "lucide-react";
+import { MapPin, ChevronDown, Heart, LogIn, LogOut, PlusCircle } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { useAuth } from "@/lib/auth-context";
 import { LoginModal } from "@/components/auth/login-modal";
+import { SuggestionModal } from "@/components/stitch/suggestion-modal";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,7 @@ export function Header() {
   const { user, signOut } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
 
   return (
     <>
@@ -103,6 +105,18 @@ export function Header() {
                           <Heart className="w-4 h-4" />
                           My Collection
                         </Link>
+
+                        <button
+                          className="flex items-center gap-3 w-full p-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-left"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            setIsSuggestionModalOpen(true);
+                          }}
+                        >
+                          <PlusCircle className="w-4 h-4" />
+                          Suggest Video
+                        </button>
+
                         <button
                           onClick={() => {
                             setIsDropdownOpen(false);
@@ -134,6 +148,12 @@ export function Header() {
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
+      />
+
+      <SuggestionModal
+        trigger={null}
+        open={isSuggestionModalOpen}
+        onOpenChange={setIsSuggestionModalOpen}
       />
     </>
   );

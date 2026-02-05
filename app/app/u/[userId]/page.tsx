@@ -5,12 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Metadata } from 'next';
 import { parseWkbPoint } from "@/lib/utils/wkb-parser";
-
-// Server-side supabase client (lightweight) or just use REST if public
-// Since we have RLS enabled for public read, we can use the anon key.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from "@/lib/supabase";
 
 interface Props {
   params: Promise<{
@@ -123,6 +118,7 @@ export default async function PublicCollectionPage({ params }: Props) {
       <CollectionHeader
         collection={collectionProp}
       />
+
 
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         <CollectionSection

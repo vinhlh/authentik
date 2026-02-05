@@ -15,7 +15,6 @@ export default async function HomePage() {
     const { data: collectionsData, error: collectionsError } = await supabase
       .from('collections')
       .select('*, collection_restaurants(count)')
-      .limit(10)
       .order('created_at', { ascending: false });
 
     if (!collectionsError && collectionsData) {

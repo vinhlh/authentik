@@ -44,6 +44,7 @@ export interface ExtractionResult {
     imported: number
     failed: number
   }
+  logs?: string[]
   dry: boolean
 }
 
@@ -284,6 +285,20 @@ export async function extractFromVideo(
           // Link to collection (upsert/handle duplicates)
           await linkRestaurantToCollection(collection.id, restaurantId, mention, verified, aiSummaryEn, aiSummaryVi)
 
+          // Process Photos (Non-blocking / Graceful fail)
+          try {
+            console.log(`   📸 Processing photos for: ${verified.name}...`)
+            const collectionSlug = createSlug(collection.name_vi || collection.name)
+
+            // We use the verified place details which has the photos array
+            await processRestaurantPhotos(verified, collectionSlug, 3, 10, {
+              skipEnhancement: false // Set to true if too slow/expensive
+            })
+          } catch (photoError) {
+            console.error(`   ⚠️ Photo processing failed for ${verified.name}:`, photoError)
+            // Don't fail the whole import just because photos failed
+          }
+
           stats.imported++
           results.push({ mention, verified, imported: true, restaurantId })
         } else {
@@ -304,6 +319,14 @@ export async function extractFromVideo(
   console.log(`   ${dry ? 'Would import' : 'Imported'}: ${stats.imported}`)
   console.log(`   Failed: ${stats.failed}`)
 
+  const logs: string[] = results
+    .filter(r => !r.imported && !r.verified)
+    .map(r => `Failed to process ${r.mention.name}`)
+
+  if (stats.failed > 0) {
+    logs.push(`${stats.failed} mentions failed verification/import`)
+  }
+
   return {
     collection: {
       id: collection.id,
@@ -313,6 +336,7 @@ export async function extractFromVideo(
     },
     restaurants: results,
     stats,
+    logs,
     dry,
   }
 }

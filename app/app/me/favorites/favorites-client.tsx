@@ -71,8 +71,6 @@ export function FavoritesClient() {
           badge: badge,
           reviewSummary: r.ai_summary_en,
           reviewSummaryVi: r.ai_summary_vi,
-          reviewSummary: r.ai_summary_en,
-          reviewSummaryVi: r.ai_summary_vi,
           coordinates: r.location ? parseWkbPoint(r.location) || undefined : undefined
         };
       }) as Restaurant[];
