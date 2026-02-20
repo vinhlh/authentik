@@ -2,7 +2,6 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
-import { extractFromVideo } from "@/lib/extraction-pipeline";
 
 // Admin-only Supabase client (service role) to bypass RLS if needed,
 // though for this we can mostly rely on the admin user's permissions if RLS is set right.
@@ -11,6 +10,9 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const EXTRACTION_DISABLED_MESSAGE =
+  "Extraction is temporarily disabled due to serverless size limits. Please run extraction outside Vercel for now.";
 
 /**
  * Ensures the current user is an admin.
@@ -65,46 +67,17 @@ export async function submitSuggestion(url: string, userId: string) {
 
 export async function approveSuggestion(suggestionId: string) {
   try {
-    // 1. Mark as processing
-    await supabaseAdmin
-      .from('video_suggestions')
-      .update({ status: 'processing' })
-      .eq('id', suggestionId);
-
-    revalidatePath('/admin');
-
-    // 2. Fetch suggestion details
-    const { data: suggestion } = await supabaseAdmin
-      .from('video_suggestions')
-      .select('youtube_url, user_id')
-      .eq('id', suggestionId)
-      .single();
-
-    if (!suggestion) throw new Error("Suggestion not found");
-
-    // 3. Trigger extraction pipeline
-    // Note: In Vercel/Serverless, this might time out if it takes too long.
-    // Ideally this is a background job. For MVP locally, we await it.
-    console.log(`Starting extraction for ${suggestion.youtube_url}...`);
-
-    // We pass "Authentik Community" or fetch the user's name as creator
-    const result = await extractFromVideo(suggestion.youtube_url, "Community Submission", { dry: false });
-
-    // 4. Mark as completed and link collection
+    // Temporarily skip heavy extraction pipeline in serverless environments.
     await supabaseAdmin
       .from('video_suggestions')
       .update({
-        status: 'completed',
-        result_collection_id: result.collection.id,
-        logs: {
-          stats: result.stats,
-          errors: result.logs || []
-        }
+        status: 'failed',
+        logs: { error: EXTRACTION_DISABLED_MESSAGE }
       })
       .eq('id', suggestionId);
 
     revalidatePath('/admin');
-    return { success: true };
+    return { success: false, error: EXTRACTION_DISABLED_MESSAGE };
 
   } catch (error: any) {
     console.error("Approval failed:", error);
@@ -138,46 +111,17 @@ export async function rejectSuggestion(suggestionId: string) {
 
 export async function reprocessSuggestion(suggestionId: string) {
   try {
-    // 1. Mark as processing (resetting logs)
+    // Temporarily skip heavy extraction pipeline in serverless environments.
     await supabaseAdmin
       .from('video_suggestions')
       .update({
-        status: 'processing',
-        logs: null
+        status: 'failed',
+        logs: { error: EXTRACTION_DISABLED_MESSAGE }
       })
       .eq('id', suggestionId);
 
     revalidatePath('/admin');
-
-    // 2. Fetch suggestion details
-    const { data: suggestion } = await supabaseAdmin
-      .from('video_suggestions')
-      .select('youtube_url, user_id')
-      .eq('id', suggestionId)
-      .single();
-
-    if (!suggestion) throw new Error("Suggestion not found");
-
-    console.log(`🔄 Reprocessing ${suggestion.youtube_url}...`);
-
-    // 3. Trigger extraction pipeline (same as approval)
-    const result = await extractFromVideo(suggestion.youtube_url, "Community Submission", { dry: false });
-
-    // 4. Mark as completed
-    await supabaseAdmin
-      .from('video_suggestions')
-      .update({
-        status: 'completed',
-        result_collection_id: result.collection.id,
-        logs: {
-          stats: result.stats,
-          errors: result.logs || []
-        }
-      })
-      .eq('id', suggestionId);
-
-    revalidatePath('/admin');
-    return { success: true };
+    return { success: false, error: EXTRACTION_DISABLED_MESSAGE };
 
   } catch (error: any) {
     console.error("Reprocessing failed:", error);

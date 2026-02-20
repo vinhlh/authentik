@@ -495,3 +495,86 @@ Extracting restaurants from transcript...
    🤖 AI analyzing 10 photos...
    ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
    ⏳ Rate limited (photo analysis), retry 2/5 in 4s...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   ⏳ Rate limited (photo analysis), retry 2/5 in 4s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 9
+   ☁️  Uploaded original: com-tam-sai-gon-cua-nguyen-quang-dung/RV6JOtnL6GVA-9.jpg
+   ⏩ Skipping enhancement for photo 3
+   ☁️  Uploaded original: com-tam-sai-gon-cua-nguyen-quang-dung/RV6JOtnL6GVA-3.jpg
+   ⏩ Skipping enhancement for photo 0
+   ☁️  Uploaded original: com-tam-sai-gon-cua-nguyen-quang-dung/RV6JOtnL6GVA-0.jpg
+   📸 Photos: 10 saved, 0 enhanced
+🔍 Verifying: Cơm tấm Ba Há
+✅ Verified: Cơm Tấm Ba Há
+   ✨ Creating new restaurant: Cơm Tấm Ba Há
+   ✨ AI Review (VI): "Bán hết rất nhanh, nên đến trước 17:00, giá cả hợp lý."
+   📸 Processing photos for: Cơm Tấm Ba Há...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 0
+   ☁️  Uploaded original: com-tam-sai-gon-cua-nguyen-quang-dung/RwZl_mMudWh0-0.jpg
+   ⏩ Skipping enhancement for photo 3
+   ☁️  Uploaded original: com-tam-sai-gon-cua-nguyen-quang-dung/RwZl_mMudWh0-3.jpg
+   ⏩ Skipping enhancement for photo 1
+   ☁️  Uploaded original: com-tam-sai-gon-cua-nguyen-quang-dung/RwZl_mMudWh0-1.jpg
+   📸 Photos: 10 saved, 0 enhanced
+
+📊 Extraction complete:
+   Total mentions: 4
+   Verified: 4
+   Imported: 4
+   Failed: 0
+
+============================================================
+Processing: https://www.youtube.com/watch?v=u7VshyNIZ0k
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=u7VshyNIZ0k
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ho Chi Minh City, Vietnam
+fetching transcript for video: u7VshyNIZ0k
+   ✅ Transcript via external service (76338 chars)
+Extracting restaurants from transcript...
+✅ Found 5 restaurant mentions
+🌏 Market focus: Ho Chi Minh City, Vietnam
+🧠 AI Processing: Generating unified collection details and reviews...
+🚀 Sending Unified Gemini Request...
+✅ Unified Data Extracted Successfully
+📝 Created collection: Nhà Hàng Âu Khu Trung Tâm Sài Gòn của Nguyễn Quang Dũng
+🔍 Verifying: Truffle & Co. Mac Thi Buoi
+✅ Verified: Truffle & Co. Mac Thi Buoi, Italian Restaurant Pizza & Pasta
+   ✨ Creating new restaurant: Truffle & Co. Mac Thi Buoi, Italian Restaurant Pizza & Pasta
+   ✨ AI Review (VI): "Salad bò mềm, sốt truffle thơm lừng, không gian hiện đại."
+   📸 Processing photos for: Truffle & Co. Mac Thi Buoi, Italian Restaurant Pizza & Pasta...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 4
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/REPfLA-IVJH4-4.jpg
+   ⏩ Skipping enhancement for photo 2
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/REPfLA-IVJH4-2.jpg
+   ⏩ Skipping enhancement for photo 6
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/REPfLA-IVJH4-6.jpg
+   📸 Photos: 10 saved, 0 enhanced
+🔍 Verifying: L' Etoile Restaurant
+No results found for: L' Etoile Restaurant Hai Bà Trưng street, near Điện Biên Phủ street, Ho Chi Minh City
+❌ Could not verify: L' Etoile Restaurant
+🔍 Verifying: The Long @ Times Square
+✅ Verified: The Long @ Times Square
+   ✨ Creating new restaurant: The Long @ Times Square
+   ✨ AI Review (VI): "Hamburger đắt tiền, cánh gà kiểu Thái không cay, view đẹp."
+   📸 Processing photos for: The Long @ Times Square...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
