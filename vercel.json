@@ -4,6 +4,6 @@
   "framework": null,
   "buildCommand": "",
   "installCommand": "",
-  "outputDirectory": "site/public",
+  "outputDirectory": "app/public",
   "cleanUrls": true
 }
