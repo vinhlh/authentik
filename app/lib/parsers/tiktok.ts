@@ -10,6 +10,7 @@ import { exec } from 'child_process'
 import util from 'util'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { RestaurantMention } from './youtube'
+import { detectMarketCityFromText, type MarketCity } from '../market-cities'
 
 const execAsync = util.promisify(exec)
 
@@ -59,6 +60,8 @@ export async function parseTikTokVideo(url: string): Promise<{
     const metadata = await extractMetadata(url)
     console.log(`   📝 Title: ${metadata.description.slice(0, 50)}...`)
     console.log(`   👤 Author: ${metadata.authorName}`)
+    const inferredCity = detectMarketCityFromText(metadata.description, metadata.authorName, url)
+    console.log(`   📍 Inferred city context: ${inferredCity.name}, ${inferredCity.country}`)
 
     // 2. Download Video (yt-dlp)
     console.log('   ⬇️  Downloading video for AI analysis...')
@@ -66,7 +69,7 @@ export async function parseTikTokVideo(url: string): Promise<{
 
     // 3. Upload to Gemini
     console.log('   🧠 Sending to Gemini 1.5 Flash (Multimodal)...')
-    const restaurants = await extractWithGemini(tempFile, metadata)
+    const restaurants = await extractWithGemini(tempFile, metadata, inferredCity)
 
     return { metadata, restaurants }
 
@@ -110,7 +113,8 @@ async function downloadVideo(url: string, outputPath: string) {
  */
 async function extractWithGemini(
   filePath: string,
-  metadata: TikTokVideoMetadata
+  metadata: TikTokVideoMetadata,
+  cityContext: MarketCity
 ): Promise<RestaurantMention[]> {
   // Read file as base64
   const fileData = fs.readFileSync(filePath)
@@ -123,13 +127,14 @@ async function extractWithGemini(
   Context:
   - Description: ${metadata.description}
   - Author: ${metadata.authorName}
-  - Location context: Da Nang, Vietnam
+  - Market focus: Vietnam and Singapore
+  - Location context: ${cityContext.name}, ${cityContext.country}
 
   Task:
   1. Identify any restaurants or food stalls mentioned or shown.
   2. Extract the name, approximate address, recommended dishes, and price estimation.
   3. Ignore non-food places.
-  4. AUTHENTIC VIETNAMESE ONLY: Strictly identify ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if they are located in Vietnam.
+  4. AUTHENTIC LOCAL ONLY: Identify authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
 
   Output ONLY valid JSON array with this structure:
   [

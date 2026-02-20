@@ -1,0 +1,20 @@
+
+> app@0.1.0 extract
+> tsx workers/extract.ts batch videos-nguyenquangdung-remaining.json
+
+[dotenv@17.2.3] injecting env (10) from .env.local -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+✅ Loaded environment from .env.local
+🔑 YOUTUBE_API_KEY loaded: AIzaS... (len: 39)
+🍜 Authentik Content Extraction Worker
+
+📋 Processing 214 videos...
+
+
+============================================================
+Processing: https://www.youtube.com/watch?v=nmEC1Z8H2mE
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=nmEC1Z8H2mE
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ho Chi Minh City, Vietnam
+fetching transcript for video: nmEC1Z8H2mE

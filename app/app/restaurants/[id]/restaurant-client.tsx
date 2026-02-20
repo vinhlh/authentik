@@ -2,11 +2,12 @@
 
 import { useLanguage } from "@/lib/i18n-context";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ArrowLeft, MapPin, Star, Utensils, DollarSign, Clock, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Restaurant } from "@/lib/supabase";
+import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
 
 interface RestaurantClientProps {
   initialRestaurant: any; // Type 'any' for now to match flexible schema, eventually 'Restaurant'
@@ -14,15 +15,17 @@ interface RestaurantClientProps {
 
 export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
   const { t, language } = useLanguage();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const collectionId = searchParams.get('collectionId');
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get('city');
   const [restaurant] = useState<any>(initialRestaurant);
 
   if (!restaurant) {
     return (
       <div className="max-w-[1200px] mx-auto px-6 py-12 text-center">
         <h1 className="text-2xl font-bold">{t('restaurant.notFound')}</h1>
-        <Link href="/" className="text-primary hover:underline mt-4 inline-block">
+        <Link href={withCityParam('/', cityId)} className="text-primary hover:underline mt-4 inline-block">
           {t('restaurant.backHome')}
         </Link>
       </div>
@@ -59,7 +62,7 @@ export function RestaurantClient({ initialRestaurant }: RestaurantClientProps) {
           className="w-full h-full object-cover"
         />
         <div className="absolute top-6 left-6 z-10">
-          <Link href={collectionId ? `/collections/${collectionId}` : "/"} className="bg-white/90 p-2 rounded-full flex items-center gap-2 hover:bg-white transition-colors text-sm font-semibold shadow-sm backdrop-blur-sm">
+          <Link href={withCityParam(collectionId ? `/collections/${collectionId}` : "/", cityId)} className="bg-white/90 p-2 rounded-full flex items-center gap-2 hover:bg-white transition-colors text-sm font-semibold shadow-sm backdrop-blur-sm">
             <ArrowLeft className="w-4 h-4" /> {t('common.viewAll')}
           </Link>
         </div>

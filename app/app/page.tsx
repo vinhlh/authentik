@@ -3,19 +3,53 @@ import { FilterBar } from "@/components/stitch/filter-bar";
 import { MasonryGrid } from "@/components/stitch/masonry-grid";
 import { supabase } from "@/lib/supabase";
 import { Restaurant } from "@/components/stitch/restaurant-card";
+import { getCollectionCityTags, getMarketCityById } from "@/lib/market-cities";
 
 export const revalidate = 60; // Revalidate every minute
 
-export default async function HomePage() {
+type PageSearchParams = {
+  city?: string | string[];
+};
+
+async function resolveSearchParams(
+  searchParams?: PageSearchParams | Promise<PageSearchParams>
+): Promise<PageSearchParams> {
+  if (!searchParams) return {};
+  if (typeof (searchParams as Promise<PageSearchParams>).then === "function") {
+    return await (searchParams as Promise<PageSearchParams>);
+  }
+  return searchParams as PageSearchParams;
+}
+
+function getFirstValue(value?: string | string[]): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: PageSearchParams | Promise<PageSearchParams>;
+}) {
+  const resolvedSearchParams = await resolveSearchParams(searchParams);
+  const selectedCity = getMarketCityById(getFirstValue(resolvedSearchParams.city));
+  const cityTags = getCollectionCityTags(selectedCity);
+
   let collections: HeroCollectionProps[] = [];
   let restaurants: Restaurant[] = [];
 
   try {
     // Fetch Collections
-    const { data: collectionsData, error: collectionsError } = await supabase
+    let collectionsQuery = supabase
       .from('collections')
-      .select('*, collection_restaurants(count)')
+      .select('*, collection_restaurants(count), tags')
       .order('created_at', { ascending: false });
+
+    if (cityTags.length > 0) {
+      collectionsQuery = collectionsQuery.overlaps('tags', cityTags);
+    }
+
+    const { data: collectionsData, error: collectionsError } = await collectionsQuery;
 
     if (!collectionsError && collectionsData) {
       collections = collectionsData.map((item: any) => ({

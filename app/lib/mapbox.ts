@@ -9,13 +9,17 @@ if (!MAPBOX_TOKEN) {
 }
 
 /**
- * Da Nang city center coordinates
+ * Market city center coordinates
  */
-export const DA_NANG_CENTER = {
-  longitude: 108.2022,
-  latitude: 16.0544,
-  zoom: 13
-}
+export const CITY_CENTERS = {
+  daNang: { longitude: 108.2022, latitude: 16.0544, zoom: 13 },
+  haNoi: { longitude: 105.8342, latitude: 21.0278, zoom: 13 },
+  hoChiMinh: { longitude: 106.6297, latitude: 10.8231, zoom: 13 },
+  hue: { longitude: 107.5909, latitude: 16.4637, zoom: 13 },
+  singapore: { longitude: 103.8198, latitude: 1.3521, zoom: 12 },
+} as const
+
+export const DA_NANG_CENTER = CITY_CENTERS.daNang
 
 /**
  * Map style URLs

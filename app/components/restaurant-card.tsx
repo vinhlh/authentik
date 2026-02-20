@@ -3,9 +3,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { MapPin, Utensils } from 'lucide-react'
 import type { Restaurant } from '@/lib/supabase'
+import { withCityParam } from '@/lib/city-url'
 
 interface RestaurantCardProps {
   restaurant: Restaurant
+  cityId?: string | null
 }
 
 const PRICE_LEVELS = {
@@ -15,7 +17,7 @@ const PRICE_LEVELS = {
   4: '$$$$',
 }
 
-export function RestaurantCard({ restaurant }: RestaurantCardProps) {
+export function RestaurantCard({ restaurant, cityId = null }: RestaurantCardProps) {
   const {
     id,
     name,
@@ -26,7 +28,7 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
   } = restaurant
 
   return (
-    <Link href={`/restaurants/${id}`}>
+    <Link href={withCityParam(`/restaurants/${id}`, cityId)}>
       <Card className="overflow-hidden transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer">
         {/* Restaurant Image - Placeholder for now */}
         <div className="relative aspect-video bg-muted">

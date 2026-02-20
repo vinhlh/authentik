@@ -24,6 +24,7 @@ Add these to your `.env.local`:
 ```env
 # Google Places API (Required)
 GOOGLE_PLACES_API_KEY=your_api_key_here
+GOOGLE_PLACES_CACHE_TTL_SECONDS=604800
 
 # YouTube Data API (Optional - for metadata)
 YOUTUBE_API_KEY=your_youtube_api_key
@@ -32,6 +33,9 @@ YOUTUBE_API_KEY=your_youtube_api_key
 GEMINI_API_KEY=your_gemini_api_key  # Recommended: Free tier available
 # OR
 OPENAI_API_KEY=your_openai_api_key
+
+# Transcript service (recommended)
+TRANSCRIPT_SERVICE_BASE_URL=http://localhost:8080
 ```
 
 ### 2. Install Additional Dependencies
@@ -202,6 +206,8 @@ Visit http://localhost:3000 to see your curated collections!
 - **Photos**: Free
 
 **Estimated cost per video**: $0.50 - $2.00 (depending on restaurant count)
+
+With persistent cache enabled, repeat extraction/update runs are usually much cheaper.
 
 ### YouTube Data API
 - **Free tier**: 10,000 quota units/day

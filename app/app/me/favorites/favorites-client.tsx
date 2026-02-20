@@ -10,10 +10,15 @@ import { Heart, Share2, ArrowLeft, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Restaurant } from "@/components/stitch/restaurant-card";
 import { parseWkbPoint } from "@/lib/utils/wkb-parser";
+import { usePathname, useSearchParams } from "next/navigation";
+import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
 
 export function FavoritesClient() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { t } = useLanguage();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
@@ -112,7 +117,7 @@ export function FavoritesClient() {
           <Heart className="w-16 h-16 text-gray-300 mx-auto mb-6" />
           <h1 className="text-2xl font-bold mb-2">Sign in to view favorites</h1>
           <p className="text-gray-500 mb-8">Save your favorite local spots to create your own collection.</p>
-          <Link href="/" className="text-primary hover:underline font-bold">Back to Home</Link>
+          <Link href={withCityParam('/', cityId)} className="text-primary hover:underline font-bold">Back to Home</Link>
         </div>
       </div>
     );
@@ -124,7 +129,7 @@ export function FavoritesClient() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-              <Link href="/" className="hover:text-primary transition-colors flex items-center gap-1">
+              <Link href={withCityParam('/', cityId)} className="hover:text-primary transition-colors flex items-center gap-1">
                 <ArrowLeft className="w-3 h-3" /> Home
               </Link>
               <span>/</span>
@@ -153,7 +158,7 @@ export function FavoritesClient() {
             <p className="text-gray-500 mb-6 max-w-md mx-auto">
               Start exploring and click the heart icon on restaurants you want to save.
             </p>
-            <Link href="/" className="inline-block bg-primary text-white font-bold px-6 py-3 rounded-xl hover:bg-primary/90 transition-colors">
+            <Link href={withCityParam('/', cityId)} className="inline-block bg-primary text-white font-bold px-6 py-3 rounded-xl hover:bg-primary/90 transition-colors">
               Explore Restaurants
             </Link>
           </div>

@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { LoginModal } from "@/components/auth/login-modal";
+import { usePathname, useSearchParams } from "next/navigation";
+import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
 
 export interface Restaurant {
   id: string;
@@ -49,6 +51,9 @@ export function RestaurantCard({
   collectionId?: string;
 }) {
   const { language, t } = useLanguage();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
   const { user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -109,6 +114,10 @@ export function RestaurantCard({
   const displayedSummary = language === 'vi'
     ? (restaurant.reviewSummaryVi || restaurant.reviewSummary)
     : (restaurant.reviewSummary || restaurant.reviewSummaryVi);
+  const restaurantHref = withCityParam(
+    `/restaurants/${restaurant.id}${collectionId ? `?collectionId=${collectionId}` : ''}`,
+    cityId
+  );
 
   return (
     <div
@@ -116,7 +125,7 @@ export function RestaurantCard({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <Link href={`/restaurants/${restaurant.id}${collectionId ? `?collectionId=${collectionId}` : ''}`}>
+      <Link href={restaurantHref}>
         <div className="bg-white rounded-xl overflow-hidden shadow-sm transition-all duration-200 group cursor-default">
           <div className="relative overflow-hidden">
             <img

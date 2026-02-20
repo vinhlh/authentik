@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ArrowLeft, Share2, CheckCircle } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
 
 interface CollectionHeaderProps {
   collection: {
@@ -15,6 +17,8 @@ interface CollectionHeaderProps {
     description_en?: string | null;
     creator_name?: string | null;
     source_url?: string;
+    source_channel_url?: string | null;
+    source_channel_name?: string | null;
   };
   coverImage?: string | null;
   coverImageSrcSet?: string;
@@ -22,6 +26,9 @@ interface CollectionHeaderProps {
 
 export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: CollectionHeaderProps) {
   const { getI18nText, t } = useLanguage();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
   const [showCopiedToast, setShowCopiedToast] = useState(false);
 
   const hasImage = !!coverImage;
@@ -53,7 +60,7 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
       )}
 
       <div className="absolute top-6 left-6 z-20">
-        <Link href="/" className="bg-white/20 backdrop-blur-md p-2 rounded-full flex items-center gap-2 hover:bg-white/30 transition-colors text-sm font-semibold text-white border border-white/20">
+        <Link href={withCityParam('/', cityId)} className="bg-white/20 backdrop-blur-md p-2 rounded-full flex items-center gap-2 hover:bg-white/30 transition-colors text-sm font-semibold text-white border border-white/20">
           <ArrowLeft className="w-4 h-4" /> {t('common.back')}
         </Link>
       </div>
@@ -89,6 +96,16 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
                 className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 hover:bg-white/30 transition-colors text-sm font-semibold text-white border border-white/20 w-fit"
               >
                 ▶ Watch Video
+              </a>
+            )}
+            {collection.source_channel_url && (
+              <a
+                href={collection.source_channel_url}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 hover:bg-white/30 transition-colors text-sm font-semibold text-white border border-white/20 w-fit"
+              >
+                {collection.source_channel_name ? `Channel: ${collection.source_channel_name}` : 'View Channel'}
               </a>
             )}
           </div>

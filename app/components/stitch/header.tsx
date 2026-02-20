@@ -1,20 +1,78 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, ChevronDown, Heart, LogIn, LogOut, PlusCircle } from "lucide-react";
+import { MapPin, ChevronDown, Heart, LogOut, PlusCircle } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { useAuth } from "@/lib/auth-context";
 import { LoginModal } from "@/components/auth/login-modal";
 import { SuggestionModal } from "@/components/stitch/suggestion-modal";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_MARKET_CITY, MARKET_CITIES, getMarketCityById, type MarketCityId } from "@/lib/market-cities";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getCityIdFromPathname, stripCityPrefix, withCityParam } from "@/lib/city-url";
+
+const CITY_STORAGE_KEY = "authentik_selected_city";
 
 export function Header() {
   const { language, setLanguage } = useLanguage();
   const { user, signOut } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cityPathId = getCityIdFromPathname(pathname);
+  const citySearchParam = searchParams.get("city");
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSuggestionModalOpen, setIsSuggestionModalOpen] = useState(false);
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const [storedCityId, setStoredCityId] = useState<MarketCityId>(() => {
+    if (typeof window === "undefined") return DEFAULT_MARKET_CITY.id;
+    const saved = window.localStorage.getItem(CITY_STORAGE_KEY);
+    return getMarketCityById(saved).id;
+  });
+
+  const selectedCityId = (cityPathId || citySearchParam)
+    ? getMarketCityById(cityPathId || citySearchParam).id
+    : storedCityId;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(CITY_STORAGE_KEY, selectedCityId);
+  }, [selectedCityId]);
+
+  const selectedCity = getMarketCityById(selectedCityId);
+  const cityForLinks = selectedCityId !== DEFAULT_MARKET_CITY.id ? selectedCityId : null;
+  const homeHref = withCityParam(
+    "/",
+    cityForLinks,
+  );
+
+  useEffect(() => {
+    if (cityPathId || citySearchParam || storedCityId === DEFAULT_MARKET_CITY.id) return;
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("city");
+    const basePath = stripCityPrefix(pathname);
+    const nextQuery = nextParams.toString();
+    const baseHref = nextQuery ? `${basePath}?${nextQuery}` : basePath;
+    router.replace(withCityParam(baseHref, storedCityId), { scroll: false });
+  }, [cityPathId, citySearchParam, storedCityId, pathname, router, searchParams]);
+
+  const handleSelectCity = (id: MarketCityId) => {
+    setStoredCityId(id);
+    setIsCityDropdownOpen(false);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("city");
+    const basePath = stripCityPrefix(pathname);
+    const nextQuery = nextParams.toString();
+    const baseHref = nextQuery ? `${basePath}?${nextQuery}` : basePath;
+    const nextHref = id === DEFAULT_MARKET_CITY.id
+      ? baseHref
+      : withCityParam(baseHref, id);
+
+    router.push(nextHref, { scroll: false });
+  };
 
   return (
     <>
@@ -22,7 +80,7 @@ export function Header() {
         <div className="max-w-[1200px] mx-auto px-6 py-4 flex items-center justify-between gap-8">
           <div className="flex items-center gap-8">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+            <Link href={homeHref} className="flex items-center gap-2 shrink-0">
               <img
                 src="/logo.png"
                 alt="Authentik"
@@ -36,11 +94,33 @@ export function Header() {
             </Link>
 
             {/* City Switcher */}
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 px-3 py-1.5 rounded-full cursor-pointer hover:border-primary hover:text-primary transition-colors">
-              <MapPin className="w-4 h-4" />
-              <span className="md:hidden">DN</span>
-              <span className="hidden md:inline">Da Nang</span>
-              <ChevronDown className="w-3 h-3 text-gray-400" />
+            <div className="relative">
+              <button
+                onClick={() => setIsCityDropdownOpen(v => !v)}
+                className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 px-3 py-1.5 rounded-full cursor-pointer hover:border-primary hover:text-primary transition-colors"
+              >
+                <MapPin className="w-4 h-4" />
+                <span className="md:hidden">{selectedCity.shortLabel}</span>
+                <span className="hidden md:inline">{selectedCity.name}</span>
+                <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isCityDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isCityDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsCityDropdownOpen(false)} />
+                  <div className="absolute top-full left-0 mt-2 w-52 rounded-xl border border-gray-200 bg-white shadow-xl z-40 overflow-hidden">
+                    {MARKET_CITIES.map(city => (
+                      <button
+                        key={city.id}
+                        onClick={() => handleSelectCity(city.id)}
+                        className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${selectedCity.id === city.id ? 'bg-primary/10 text-primary font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {city.name}, {city.country}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -98,7 +178,7 @@ export function Header() {
                       </div>
                       <div className="p-2">
                         <Link
-                          href="/me/favorites"
+                          href={withCityParam('/me/favorites', cityForLinks)}
                           className="flex items-center gap-3 w-full p-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                           onClick={() => setIsDropdownOpen(false)}
                         >

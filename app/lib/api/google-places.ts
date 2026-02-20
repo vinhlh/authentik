@@ -4,6 +4,10 @@
  * Using Places API (New) - https://developers.google.com/maps/documentation/places/web-service
  */
 
+import crypto from 'crypto'
+import { detectMarketCityFromText } from '../market-cities'
+import { supabase } from '../supabase'
+
 // Use getter function to read API key at runtime (not at module load time)
 function getApiKey(): string {
   const key = process.env.GOOGLE_PLACES_API_KEY
@@ -18,6 +22,119 @@ function getApiKey(): string {
 const PLACES_API_NEW = 'https://places.googleapis.com/v1'
 // Legacy API for photo URLs (still needed for photo_reference compatibility)
 const PLACES_API_LEGACY = 'https://maps.googleapis.com/maps/api/place'
+
+const GOOGLE_PLACES_CACHE_TTL_MS = (Number(process.env.GOOGLE_PLACES_CACHE_TTL_SECONDS || 7 * 24 * 60 * 60) || 7 * 24 * 60 * 60) * 1000
+const inMemoryPlacesCache = new Map<string, { value: unknown; expiresAt: number }>()
+
+type PlacesCacheKind = 'search' | 'details'
+
+function normalizeCacheText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function buildLocationKey(location?: { lat: number; lng: number }): string | null {
+  if (!location) return null
+  // Round to reduce cardinality while preserving meaningful locality.
+  return `${location.lat.toFixed(3)},${location.lng.toFixed(3)}`
+}
+
+function buildCacheKey(kind: PlacesCacheKind, rawKey: string): string {
+  const hash = crypto.createHash('sha256').update(rawKey).digest('hex')
+  return `${kind}:${hash}`
+}
+
+function readFromMemoryCache<T>(cacheKey: string): T | null {
+  const entry = inMemoryPlacesCache.get(cacheKey)
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) {
+    inMemoryPlacesCache.delete(cacheKey)
+    return null
+  }
+  return entry.value as T
+}
+
+function writeToMemoryCache(cacheKey: string, value: unknown): void {
+  inMemoryPlacesCache.set(cacheKey, {
+    value,
+    expiresAt: Date.now() + GOOGLE_PLACES_CACHE_TTL_MS,
+  })
+
+  if (inMemoryPlacesCache.size > 500) {
+    const oldestKey = inMemoryPlacesCache.keys().next().value as string | undefined
+    if (oldestKey) inMemoryPlacesCache.delete(oldestKey)
+  }
+}
+
+function isMissingCacheTableError(error: unknown): boolean {
+  const message = String((error as any)?.message || '').toLowerCase()
+  return (
+    message.includes('google_places_cache') &&
+    (message.includes('does not exist') || message.includes('relation') || message.includes('schema cache'))
+  )
+}
+
+async function readFromPersistentCache<T>(cacheKey: string): Promise<T | null> {
+  try {
+    const { data, error } = await supabase
+      .from('google_places_cache')
+      .select('response, expires_at')
+      .eq('cache_key', cacheKey)
+      .maybeSingle()
+
+    if (error) {
+      if (!isMissingCacheTableError(error)) {
+        console.warn('⚠️ Failed reading Google Places persistent cache:', (error as any)?.message || error)
+      }
+      return null
+    }
+
+    if (!data) {
+      return null
+    }
+
+    const expiresAt = new Date(data.expires_at).getTime()
+    if (Number.isNaN(expiresAt) || Date.now() >= expiresAt) {
+      return null
+    }
+
+    return data.response as T
+  } catch (error) {
+    if (!isMissingCacheTableError(error)) {
+      console.warn('⚠️ Failed reading Google Places persistent cache:', (error as any)?.message || error)
+    }
+    return null
+  }
+}
+
+async function writeToPersistentCache(params: {
+  cacheKey: string
+  cacheKind: PlacesCacheKind
+  response: unknown
+  placeId?: string | null
+  queryText?: string | null
+  locationKey?: string | null
+}): Promise<void> {
+  try {
+    const expiresAt = new Date(Date.now() + GOOGLE_PLACES_CACHE_TTL_MS).toISOString()
+
+    await supabase
+      .from('google_places_cache')
+      .upsert({
+        cache_key: params.cacheKey,
+        cache_kind: params.cacheKind,
+        place_id: params.placeId || null,
+        query_text: params.queryText || null,
+        location_key: params.locationKey || null,
+        response: params.response,
+        expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'cache_key' })
+  } catch (error) {
+    if (!isMissingCacheTableError(error)) {
+      console.warn('⚠️ Failed writing Google Places persistent cache:', (error as any)?.message || error)
+    }
+  }
+}
 
 /**
  * Common headers for Places API (New)
@@ -141,6 +258,18 @@ export async function searchPlace(
   location?: { lat: number; lng: number }
 ): Promise<PlaceSearchResult[]> {
   const fieldMask = 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.types,places.photos'
+  const normalizedQuery = normalizeCacheText(query)
+  const locationKey = buildLocationKey(location)
+  const cacheKey = buildCacheKey('search', `q:${normalizedQuery}|loc:${locationKey || 'none'}`)
+
+  const inMemoryHit = readFromMemoryCache<PlaceSearchResult[]>(cacheKey)
+  if (inMemoryHit) return inMemoryHit
+
+  const persistentHit = await readFromPersistentCache<PlaceSearchResult[]>(cacheKey)
+  if (persistentHit) {
+    writeToMemoryCache(cacheKey, persistentHit)
+    return persistentHit
+  }
 
   const body: any = { textQuery: query }
 
@@ -167,7 +296,16 @@ export async function searchPlace(
   const data = await response.json()
 
   // Convert to legacy format for compatibility
-  return (data.places || []).map(convertPlaceToLegacy)
+  const converted = (data.places || []).map(convertPlaceToLegacy)
+  writeToMemoryCache(cacheKey, converted)
+  await writeToPersistentCache({
+    cacheKey,
+    cacheKind: 'search',
+    response: converted,
+    queryText: normalizedQuery,
+    locationKey,
+  })
+  return converted
 }
 
 /**
@@ -178,6 +316,16 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
 
   // Ensure place ID is clean (strip any prefix if accidentally included)
   const cleanPlaceId = placeId.startsWith('places/') ? placeId.substring(7) : placeId
+  const cacheKey = buildCacheKey('details', cleanPlaceId)
+
+  const inMemoryHit = readFromMemoryCache<PlaceDetails>(cacheKey)
+  if (inMemoryHit) return inMemoryHit
+
+  const persistentHit = await readFromPersistentCache<PlaceDetails>(cacheKey)
+  if (persistentHit) {
+    writeToMemoryCache(cacheKey, persistentHit)
+    return persistentHit
+  }
 
   const url = `${PLACES_API_NEW}/places/${cleanPlaceId}`
 
@@ -198,7 +346,15 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
   const data = await response.json()
 
   // Convert to legacy format for compatibility
-  return convertDetailsToLegacy(data)
+  const converted = convertDetailsToLegacy(data)
+  writeToMemoryCache(cacheKey, converted)
+  await writeToPersistentCache({
+    cacheKey,
+    cacheKind: 'details',
+    response: converted,
+    placeId: cleanPlaceId,
+  })
+  return converted
 }
 
 /**
@@ -270,12 +426,23 @@ function isValidFoodVenue(place: PlaceSearchResult): boolean {
  */
 export async function verifyRestaurant(
   name: string,
-  address?: string
+  address?: string,
+  options: {
+    locationBias?: { lat: number; lng: number }
+    cityName?: string
+  } = {}
 ): Promise<PlaceDetails | null> {
   try {
     // Search for the restaurant
-    const query = address ? `${name} ${address}` : name
-    const results = await searchPlace(query)
+    const inferredCityFromAddress = address ? detectMarketCityFromText(address) : null
+    const searchLocation = options.locationBias ||
+      (inferredCityFromAddress ? { lat: inferredCityFromAddress.latitude, lng: inferredCityFromAddress.longitude } : undefined)
+    const query = address
+      ? `${name} ${address}`
+      : options.cityName
+        ? `${name} ${options.cityName}`
+        : name
+    const results = await searchPlace(query, searchLocation)
 
     if (results.length === 0) {
       console.log(`No results found for: ${query}`)
@@ -836,4 +1003,3 @@ export function selectBestPhotos(
     .sort((a, b) => b.score - a.score)
     .slice(0, maxPhotos)
 }
-

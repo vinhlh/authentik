@@ -1,0 +1,131 @@
+
+> app@0.1.0 extract
+> tsx workers/extract.ts batch videos-nguyenquangdung-remaining.json
+
+[dotenv@17.2.3] injecting env (10) from .env.local -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+✅ Loaded environment from .env.local
+🔑 YOUTUBE_API_KEY loaded: AIzaS... (len: 39)
+🍜 Authentik Content Extraction Worker
+
+📋 Processing 214 videos...
+
+
+============================================================
+Processing: https://www.youtube.com/watch?v=nmEC1Z8H2mE
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=nmEC1Z8H2mE
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ho Chi Minh City, Vietnam
+fetching transcript for video: nmEC1Z8H2mE
+   ✅ Transcript via external service (25044 chars)
+Extracting restaurants from transcript...
+✅ Found 3 restaurant mentions
+🌏 Market focus: Ho Chi Minh City, Vietnam
+🧠 AI Processing: Generating unified collection details and reviews...
+🚀 Sending Unified Gemini Request...
+✅ Unified Data Extracted Successfully
+📝 Created collection: Các Tiệm Mì Hoa ở Sài Gòn với Nguyễn Quang Dũng
+🔍 Verifying: Mì Chú Thòn
+✅ Verified: Hủ Tiếu Mì Gia Chú Thòn
+   ✨ Creating new restaurant: Hủ Tiếu Mì Gia Chú Thòn
+   ✨ AI Review (VI): "Nước sốt ngọt, mì thập cẩm phong phú, thịt chưa đặc sắc."
+   📸 Processing photos for: Hủ Tiếu Mì Gia Chú Thòn...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 2
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/RE40vymtmfAs-2.jpg
+   ⏩ Skipping enhancement for photo 1
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/RE40vymtmfAs-1.jpg
+   ⏩ Skipping enhancement for photo 5
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/RE40vymtmfAs-5.jpg
+   📸 Photos: 10 saved, 0 enhanced
+🔍 Verifying: Mì - Điểm Tâm 259 Hồng Bàng
+✅ Verified: Điểm tâm 259 Hồng Bàng
+   ✨ Creating new restaurant: Điểm tâm 259 Hồng Bàng
+   ✨ AI Review (VI): "Xíu mại tươi ngon, mì sườn mềm mại, không gian thoáng đãng."
+   📸 Processing photos for: Điểm tâm 259 Hồng Bàng...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   ⏳ Rate limited (photo analysis), retry 2/5 in 4s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 9
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/RH_XlN1f8fls-9.jpg
+   ⏩ Skipping enhancement for photo 1
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/RH_XlN1f8fls-1.jpg
+   ⏩ Skipping enhancement for photo 5
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/RH_XlN1f8fls-5.jpg
+   📸 Photos: 10 saved, 0 enhanced
+🔍 Verifying: Mì Nhật Tảo
+✅ Verified: Hu tieu mi ga Nguyen Kim
+   ✨ Creating new restaurant: Hu tieu mi ga Nguyen Kim
+   ✨ AI Review (VI): "Miến gà thơm ngon, nước dùng đậm đà, không gian rộng rãi."
+   📸 Processing photos for: Hu tieu mi ga Nguyen Kim...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 0
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/R4y0uTdW6l2U-0.jpg
+   ⏩ Skipping enhancement for photo 6
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/R4y0uTdW6l2U-6.jpg
+   ⏩ Skipping enhancement for photo 4
+   ☁️  Uploaded original: cac-tiem-mi-hoa-o-sai-gon-voi-nguyen-quang-dung/R4y0uTdW6l2U-4.jpg
+   📸 Photos: 10 saved, 0 enhanced
+
+📊 Extraction complete:
+   Total mentions: 3
+   Verified: 3
+   Imported: 3
+   Failed: 0
+
+============================================================
+Processing: https://www.youtube.com/watch?v=MPeUu36Fh9A
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=MPeUu36Fh9A
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ha Noi, Vietnam
+fetching transcript for video: MPeUu36Fh9A
+   ✅ Transcript via external service (72027 chars)
+Extracting restaurants from transcript...
+✅ Found 6 restaurant mentions
+🌏 Market focus: Ha Noi, Vietnam
+🧠 AI Processing: Generating unified collection details and reviews...
+🚀 Sending Unified Gemini Request...
+⏳ AI Rate limit hit. Retrying in 15s...
+✅ Unified Data Extracted Successfully
+📝 Created collection: Ẩm Thực Vũng Tàu cùng Nguyễn Quang Dũng
+🔍 Verifying: Hủ tiếu mực Ổng già Cali
+✅ Verified: Hủ Tiếu Mực Ông Già Cali
+   ✨ Creating new restaurant: Hủ Tiếu Mực Ông Già Cali
+   ✨ AI Review (VI): "Không gian thoáng đãng, hải sản tươi ngon, giá cả phải chăng."
+   📸 Processing photos for: Hủ Tiếu Mực Ông Già Cali...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 7
+   ☁️  Uploaded original: am-thuc-vung-tau-cung-nguyen-quang-dung/RSriBlh7_u-0-7.jpg
+   ⏩ Skipping enhancement for photo 3
+   ☁️  Uploaded original: am-thuc-vung-tau-cung-nguyen-quang-dung/RSriBlh7_u-0-3.jpg
+   ⏩ Skipping enhancement for photo 0
+   ☁️  Uploaded original: am-thuc-vung-tau-cung-nguyen-quang-dung/RSriBlh7_u-0-0.jpg
+   📸 Photos: 10 saved, 0 enhanced
+🔍 Verifying: Phở Thanh Bình
+✅ Verified: Phở Thanh Bình
+   ✨ Creating new restaurant: Phở Thanh Bình
+   ✨ AI Review (VI): "Hương vị phở Bắc truyền thống, nước dùng thanh, đậm đà."
+   📸 Processing photos for: Phở Thanh Bình...
+   🧹 Cleaning up old photos...
+   📥 Downloading 8 candidate photos...

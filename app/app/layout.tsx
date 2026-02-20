@@ -12,11 +12,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://authentik.app'),
   title: {
-    default: "Authentik - Discover Authentic Da Nang Food",
+    default: "Authentik - Discover Authentic Vietnam and Singapore Food",
     template: "%s | Authentik"
   },
-  description: "Discover where Da Nang locals actually eat. Curated restaurant collections filtering out fake reviews and tourist traps.",
-  keywords: ["Da Nang", "food", "restaurants", "authentic", "local", "Vietnam", "travel", "cuisine"],
+  description: "Discover where locals actually eat across Vietnam and Singapore. Curated restaurant collections filtering out fake reviews and tourist traps.",
+  keywords: ["Vietnam", "Singapore", "food", "restaurants", "authentic", "local", "travel", "cuisine", "Ha Noi", "Ho Chi Minh City", "Hue", "Da Nang"],
   authors: [{ name: "Authentik Team" }],
   creator: "Authentik",
   openGraph: {
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "/",
     title: "Authentik - Real Local Food",
-    description: "No tourist traps. Just authentic local favorites in Da Nang.",
+    description: "No tourist traps. Just authentic local favorites in Vietnam and Singapore.",
     siteName: "Authentik",
     images: [{
       url: "/og-image.jpg", // Needs to be added to public/
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Authentik - Real Local Food",
-    description: "Discover authentic local food in Da Nang.",
+    description: "Discover authentic local food in Vietnam and Singapore.",
     creator: "@authentik",
     images: ["/og-image.jpg"],
   },

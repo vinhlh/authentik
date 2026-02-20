@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 import type { Collection } from '@/lib/supabase'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { getCityIdFromPathname } from '@/lib/city-url'
 
 interface CollectionsGridProps {
   initialCollections: (Collection & {
@@ -16,8 +17,10 @@ interface CollectionsGridProps {
 }
 
 export function CollectionsGrid({ initialCollections }: CollectionsGridProps) {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const initialTag = searchParams.get('tag')
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get('city')
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(initialTag)
@@ -112,6 +115,7 @@ export function CollectionsGrid({ initialCollections }: CollectionsGridProps) {
                 key={collection.id}
                 collection={collection}
                 restaurantCount={count}
+                cityId={cityId}
               />
             )
           })}

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { ArrowRight, Utensils } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
+import { usePathname, useSearchParams } from "next/navigation";
+import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
 
 interface CollectionCardProps {
   collection: {
@@ -18,6 +20,9 @@ interface CollectionCardProps {
 
 export function CollectionCard({ collection }: CollectionCardProps) {
   const { getI18nText } = useLanguage();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
 
   const name = getI18nText(collection, 'name');
 
@@ -34,7 +39,7 @@ export function CollectionCard({ collection }: CollectionCardProps) {
     : undefined;
 
   return (
-    <Link href={`/collections/${collection.id}`} className="group block h-full">
+    <Link href={withCityParam(`/collections/${collection.id}`, cityId)} className="group block h-full">
       <div className="relative h-full bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 border border-transparent hover:border-gray-100 flex flex-col">
         {/* Image with responsive srcSet - 16:9 Ratio for YouTube style */}
         <div className="aspect-video relative overflow-hidden bg-gray-100">

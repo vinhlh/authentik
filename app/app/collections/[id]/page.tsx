@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // Fetch collection
   const { data: collection, error } = await supabase
     .from('collections')
-    .select('name_vi, name_en, description_vi, description_en, source_url')
+    .select('name_vi, name_en, description_vi, description_en, source_url, source_channel_url, source_channel_name')
     .eq('id', id)
     .single();
 
@@ -67,6 +67,8 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
     description_vi: "Một vòng dạo quanh những quán bánh mì giòn rụm, đậm đà nhất thành phố, được người địa phương tuyển chọn.",
     creator_name: "Vinh Le",
     source_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    source_channel_url: "https://www.youtube.com/@authentik",
+    source_channel_name: "Authentik",
     restaurants: [
       {
         id: "101",

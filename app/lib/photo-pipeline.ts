@@ -520,7 +520,7 @@ export async function processRestaurantPhotos(
   collectionSlug: string,
   maxPhotos: number = 3,
   maxCandidates: number = 20,
-  options: { skipAnalysis?: boolean; skipEnhancement?: boolean } = {}
+  options: { skipAnalysis?: boolean; skipEnhancement?: boolean } = { skipEnhancement: true }
 ): Promise<PhotoResult[]> {
   const results: PhotoResult[] = []
 

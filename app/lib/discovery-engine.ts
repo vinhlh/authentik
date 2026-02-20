@@ -50,7 +50,7 @@ function getMockCandidates(query: string): ContentCandidate[] {
     {
       id: "vid2",
       url: "https://youtube.com/watch?v=mock2",
-      title: "Street Food Tour: Da Nang - What to Eat",
+      title: "Street Food Tour: Singapore and Ho Chi Minh City",
       channelName: "Travel & Taste",
       thumbnailUrl: "https://via.placeholder.com/640x360",
       publishedAt: new Date().toISOString(),

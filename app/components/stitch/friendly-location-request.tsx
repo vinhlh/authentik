@@ -56,8 +56,8 @@ export function FriendlyLocationRequest() {
             </h3>
             <p className="text-gray-500 text-sm leading-relaxed mb-4">
               {language === 'vi'
-                ? 'Cho phép truy cập vị trí để xem khoảng cách từ bạn đến những quán ăn ngon tại Đà Nẵng.'
-                : 'Allow location access to see the distance to authentic restaurants around you in Da Nang.'}
+                ? 'Cho phép truy cập vị trí để xem khoảng cách từ bạn đến những quán ăn ngon xung quanh.'
+                : 'Allow location access to see the distance to authentic restaurants around you.'}
             </p>
             <div className="flex gap-3">
               <Button

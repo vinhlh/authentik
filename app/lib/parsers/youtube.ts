@@ -9,6 +9,7 @@ import path from 'path'
 import os from 'os'
 import util from 'util'
 import { exec } from 'child_process'
+import { detectMarketCityFromText, type MarketCity } from '../market-cities'
 
 const execAsync = util.promisify(exec)
 
@@ -39,11 +40,382 @@ export interface YouTubeVideoMetadata {
   likeCount: number
 }
 
+type TranscriptCacheEntry = { value: string | null; expiresAt: number }
+const transcriptCache = new Map<string, TranscriptCacheEntry>()
+const TRANSCRIPT_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const TRANSCRIPT_NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000
+
+const YTDLP_BOT_BLOCK_TTL_MS = 30 * 60 * 1000
+const ytdlpBotBlockCache = new Map<string, number>()
+
+function isYtDlpBotBlocked(videoId: string): boolean {
+  const until = ytdlpBotBlockCache.get(videoId)
+  if (!until) return false
+  if (Date.now() > until) {
+    ytdlpBotBlockCache.delete(videoId)
+    return false
+  }
+  return true
+}
+
+function markYtDlpBotBlocked(videoId: string) {
+  ytdlpBotBlockCache.set(videoId, Date.now() + YTDLP_BOT_BLOCK_TTL_MS)
+}
+
+function isYtDlpBotCheckMessage(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes("sign in to confirm") ||
+    m.includes("you're not a bot") ||
+    m.includes("you’re not a bot") ||
+    m.includes("captcha") ||
+    m.includes("cookies-from-browser") ||
+    m.includes("--cookies")
+  )
+}
+
+function isYtDlpMissingBrowserCookiesMessage(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('could not find') &&
+    m.includes('cookies') &&
+    m.includes('database')
+  )
+}
+
+function isYtDlpFormatsMissingMessage(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('only images are available') ||
+    m.includes('requested format is not available') ||
+    m.includes('some formats may be missing') ||
+    m.includes('n challenge solving failed') ||
+    m.includes('found 0 sig function possibilities')
+  )
+}
+
+function getYtDlpAuthOptions(): Record<string, unknown> {
+  // Optional: allow authenticated yt-dlp runs to avoid bot-check blocks.
+  // Supported values: chrome, firefox, safari, edge, etc (yt-dlp --cookies-from-browser).
+  const cookiesFromBrowser = process.env.YT_DLP_COOKIES_FROM_BROWSER?.trim()
+  const cookies = process.env.YT_DLP_COOKIES?.trim()
+
+  const opts: Record<string, unknown> = {}
+  if (cookiesFromBrowser) opts.cookiesFromBrowser = cookiesFromBrowser
+  if (cookies) opts.cookies = cookies
+  return opts
+}
+
+function getYtDlpAuthCandidates(): Array<Record<string, unknown>> {
+  const configured = getYtDlpAuthOptions()
+  if (Object.keys(configured).length > 0) return [configured]
+
+  // Only used as a retry after a bot-check error; see rawTranscriptFetch/transcribeAudio.
+  const disabled = process.env.YT_DLP_DISABLE_BROWSER_COOKIES?.trim()
+  if (disabled === '1' || disabled?.toLowerCase() === 'true') return [{}]
+
+  const browsers = ['chrome', 'edge', 'firefox', 'safari']
+  return [{}].concat(browsers.map(b => ({ cookiesFromBrowser: b })))
+}
+
+function describeYtDlpAuth(auth: Record<string, unknown>): string {
+  if (auth.cookies) return 'cookies file'
+  if (auth.cookiesFromBrowser) return `cookies-from-browser=${auth.cookiesFromBrowser}`
+  return 'no auth'
+}
+
+function shouldIgnoreYtDlpBotBlock(): boolean {
+  // If the user configured cookies, don't short-circuit based on a previous unauth'd bot block.
+  const configured = getYtDlpAuthOptions()
+  return Object.keys(configured).length > 0
+}
+
+async function findFirstExistingFile(paths: string[]): Promise<string | null> {
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) return p
+    } catch { }
+  }
+  return null
+}
+
+async function convertAudioToM4a(inputPath: string, outputPath: string): Promise<string> {
+  const ffmpegModule = await import('fluent-ffmpeg')
+  const ffmpeg = (ffmpegModule as any).default ?? ffmpegModule
+
+  const ffmpegStaticModule = await import('ffmpeg-static')
+  const ffmpegPath = (ffmpegStaticModule as any).default ?? ffmpegStaticModule
+  if (typeof ffmpegPath === 'string') {
+    ffmpeg.setFfmpegPath(ffmpegPath)
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    ffmpeg(inputPath)
+      .noVideo()
+      .audioCodec('aac')
+      .outputOptions(['-movflags', 'faststart'])
+      .format('ipod') // m4a container
+      .save(outputPath)
+      .on('end', () => resolve())
+      .on('error', (err: any) => reject(err))
+  })
+
+  return outputPath
+}
+
+async function downloadAudioViaYtdlCore(videoId: string, outputBasePathNoExt: string): Promise<string | null> {
+  try {
+    const ytdlModule = await import('@distube/ytdl-core')
+    const ytdl = (ytdlModule as any).default ?? ytdlModule
+
+    const { pipeline } = await import('stream/promises')
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+
+    // Prefer MP4/M4A-like containers to minimize re-encoding.
+    const info = await ytdl.getInfo(url, {
+      requestOptions: {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        },
+      },
+    })
+
+    const audioOnly = ytdl.filterFormats(info.formats, 'audioonly')
+    if (!audioOnly?.length) return null
+
+    const sorted = [...audioOnly].sort((a: any, b: any) => (b.audioBitrate || 0) - (a.audioBitrate || 0))
+    const preferred =
+      sorted.find((f: any) => f.container === 'mp4') ??
+      sorted.find((f: any) => f.container === 'm4a') ??
+      sorted[0]
+
+    if (!preferred) return null
+
+    const ext = preferred.container || 'webm'
+    const outPath = `${outputBasePathNoExt}.${ext}`
+    const stream = ytdl.downloadFromInfo(info, { format: preferred })
+
+    await pipeline(stream, fs.createWriteStream(outPath))
+    return outPath
+  } catch (e) {
+    console.warn('   ⚠️ ytdl-core audio download failed:', (e as any)?.message || e)
+    return null
+  }
+}
+
+function getCachedTranscript(videoId: string): string | null | undefined {
+  const entry = transcriptCache.get(videoId)
+  if (!entry) return undefined
+  if (Date.now() > entry.expiresAt) {
+    transcriptCache.delete(videoId)
+    return undefined
+  }
+  return entry.value
+}
+
+function setCachedTranscript(videoId: string, value: string | null) {
+  const ttl = value ? TRANSCRIPT_CACHE_TTL_MS : TRANSCRIPT_NEGATIVE_CACHE_TTL_MS
+  transcriptCache.set(videoId, { value, expiresAt: Date.now() + ttl })
+  // Simple bounded cache: delete oldest insertion when too large.
+  if (transcriptCache.size > 250) {
+    const firstKey = transcriptCache.keys().next().value as string | undefined
+    if (firstKey) transcriptCache.delete(firstKey)
+  }
+}
+
+function getTranscriptServiceBaseUrl(): string {
+  return (process.env.TRANSCRIPT_SERVICE_BASE_URL || 'http://localhost:8080').replace(/\/+$/, '')
+}
+
+function isTranscriptServiceDisabled(): boolean {
+  const raw = process.env.TRANSCRIPT_SERVICE_DISABLED?.trim().toLowerCase()
+  return raw === '1' || raw === 'true'
+}
+
+interface TranscriptServiceSegment {
+  start?: number
+  end?: number
+  text?: string
+}
+
+interface TranscriptServiceResponse {
+  ok?: boolean
+  error?: string
+  details?: string
+  transcript?: string
+  segments?: TranscriptServiceSegment[]
+  [key: string]: unknown
+}
+
+function toTranscriptTextFromServicePayload(payload: unknown): { text: string | null; error?: string } {
+  if (!payload || typeof payload !== 'object') {
+    return { text: normalizeTranscriptPayload(payload) }
+  }
+
+  const typed = payload as TranscriptServiceResponse
+  const combinedError = [typed.error, typed.details].filter(Boolean).join(': ')
+
+  if (typeof typed.transcript === 'string' && typed.transcript.trim()) {
+    return { text: typed.transcript, error: combinedError || undefined }
+  }
+
+  if (Array.isArray(typed.segments)) {
+    const fromSegments = typed.segments
+      .map(seg => (typeof seg?.text === 'string' ? seg.text : ''))
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+    if (fromSegments) {
+      return { text: fromSegments, error: combinedError || undefined }
+    }
+  }
+
+  const fallback = normalizeTranscriptPayload(payload)
+  const impliedError =
+    combinedError ||
+    (typed.ok === false ? 'Transcript service returned ok=false' : undefined)
+  return { text: fallback, error: impliedError }
+}
+
+function normalizeTranscriptPayload(payload: unknown): string | null {
+  if (!payload) return null
+
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim()
+    return trimmed || null
+  }
+
+  if (Array.isArray(payload)) {
+    const text = payload
+      .map(item => {
+        if (typeof item === 'string') return item
+        if (item && typeof item === 'object' && typeof (item as any).text === 'string') return (item as any).text
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+    return text || null
+  }
+
+  if (typeof payload === 'object') {
+    const obj = payload as Record<string, unknown>
+    return (
+      normalizeTranscriptPayload(obj.transcript) ||
+      normalizeTranscriptPayload(obj.text) ||
+      normalizeTranscriptPayload(obj.content) ||
+      normalizeTranscriptPayload(obj.data) ||
+      normalizeTranscriptPayload(obj.result) ||
+      normalizeTranscriptPayload(obj.segments) ||
+      null
+    )
+  }
+
+  return null
+}
+
+async function getTranscriptFromService(videoId: string): Promise<string | null> {
+  if (isTranscriptServiceDisabled()) return null
+
+  const baseUrl = getTranscriptServiceBaseUrl()
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
+  const requestUrl = `${baseUrl}/transcript?url=${encodeURIComponent(videoUrl)}`
+  const timeoutMs = Number(process.env.TRANSCRIPT_SERVICE_TIMEOUT_MS || 30000) || 30000
+
+  try {
+    const response = await withTimeout(fetch(requestUrl), timeoutMs, 'transcript-service')
+    const contentType = response.headers.get('content-type') || ''
+
+    let payload: unknown
+    if (contentType.includes('application/json')) {
+      payload = await response.json()
+    } else {
+      const raw = await response.text()
+      const maybeJson = raw.trim()
+      if (!maybeJson) return null
+
+      if (maybeJson.startsWith('{') || maybeJson.startsWith('[')) {
+        try {
+          payload = JSON.parse(maybeJson)
+        } catch {
+          payload = maybeJson
+        }
+      } else {
+        payload = maybeJson
+      }
+    }
+
+    const { text, error } = toTranscriptTextFromServicePayload(payload)
+
+    if (!response.ok) {
+      if (error) {
+        console.warn(`   ⚠️ Transcript service ${response.status}: ${error}`)
+      } else {
+        console.warn(`   ⚠️ Transcript service ${response.status}. Falling back...`)
+      }
+      return null
+    }
+
+    if (!text) {
+      if (error) {
+        console.warn(`   ⚠️ Transcript service returned empty transcript: ${error}`)
+      }
+      return null
+    }
+
+    return normalizeTranscriptText(text)
+  } catch (error: any) {
+    console.warn(`   ⚠️ Transcript service unavailable: ${error?.message || String(error)}`)
+    return null
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timeoutId: NodeJS.Timeout | undefined
+  const timeout = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId)
+  }) as Promise<T>
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function generateContentWithRetry(
+  model: any,
+  prompt: any,
+  opts?: { maxAttempts?: number; baseDelayMs?: number }
+) {
+  const maxAttempts = opts?.maxAttempts ?? 3
+  const baseDelayMs = opts?.baseDelayMs ?? 1200
+
+  let attempt = 0
+  while (true) {
+    attempt++
+    try {
+      return await model.generateContent(prompt)
+    } catch (e: any) {
+      const status = e?.status
+      if (attempt >= maxAttempts || status !== 429) throw e
+      const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 250)
+      console.warn(`⚠️ Gemini 429 (rate limit). Retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})...`)
+      await sleep(delay)
+    }
+  }
+}
+
 /**
  * Extract video ID from YouTube URL
  */
 export function extractVideoId(url: string): string | null {
   const patterns = [
+    // watch?v= / youtu.be / embed / shorts / live
+    /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([A-Za-z0-9_-]{11})/,
+    // Legacy patterns
     /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
     /youtube\.com\/embed\/([^&\n?#]+)/,
   ]
@@ -56,6 +428,70 @@ export function extractVideoId(url: string): string | null {
   }
 
   return null
+}
+
+function decodeHtmlEntities(input: string): string {
+  // youtube-transcript returns XML-escaped text; decode common entities + numeric forms.
+  return input
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x([0-9a-f]+);/gi, (_m, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_m, dec) => String.fromCodePoint(parseInt(dec, 10)))
+}
+
+function shouldDropCaptionLine(line: string): boolean {
+  const s = line.trim()
+  if (!s) return true
+
+  // Drop common short stage directions.
+  const bracketed = s.match(/^[\[(](.+)[\])]$/)
+  if (bracketed) {
+    const inner = bracketed[1].trim().toLowerCase()
+    if (inner.length <= 40) {
+      const dropTokens = [
+        'music',
+        'applause',
+        'laughter',
+        'nhac',
+        'am nhac',
+        'tieng nhac',
+        'tieng vo tay',
+        'tieng cuoi',
+        'cuoi',
+      ]
+      if (dropTokens.some(t => inner.includes(t))) return true
+    }
+  }
+
+  return false
+}
+
+export function normalizeTranscriptText(input: string): string {
+  const decoded = decodeHtmlEntities(input)
+    .replace(/\r\n/g, '\n')
+    .replace(/\u200B/g, '')
+    .trim()
+
+  if (!decoded) return ''
+
+  const parts = decoded
+    .split('\n')
+    .map(p => p.replace(/\s+/g, ' ').trim())
+    .filter(p => !shouldDropCaptionLine(p))
+
+  // Deduplicate consecutive identical segments.
+  const deduped: string[] = []
+  for (const part of parts) {
+    if (deduped.length === 0 || deduped[deduped.length - 1] !== part) {
+      deduped.push(part)
+    }
+  }
+
+  return deduped.join(' ').replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -169,55 +605,103 @@ export async function getVideoMetadata(
  * Note: This requires the youtube-transcript package
  */
 export async function getVideoTranscript(videoId: string): Promise<string | null> {
-  const { YoutubeTranscript } = await import('youtube-transcript')
+  const cached = getCachedTranscript(videoId)
+  if (cached !== undefined) return cached
+
+  const serviceTranscript = await getTranscriptFromService(videoId)
+  if (serviceTranscript) {
+    console.log(`   ✅ Transcript via external service (${serviceTranscript.length} chars)`)
+    setCachedTranscript(videoId, serviceTranscript)
+    return serviceTranscript
+  }
+
+  const yt = await import('youtube-transcript')
+  const YoutubeTranscript = yt.YoutubeTranscript
 
   try {
-    // 1. Fetch ALL available transcripts
-    /*
-       Note: fetchTranscript can take a config object.
-       Use a dummy request first or just try to get the default to see what happens?
-       Actually, youtube-transcript doesn't expose list easily without a workaround or just trying.
-
-       Wait, the library documentation says we can just try, or use a separate internal method if exposed.
-       But standard usage is just calling it.
-
-       Let's try a waterfall approach which is most reliable with this specific library:
-    */
-
-    // Attempt 1: Explicit Vietnamese (Manual or Auto)
-    try {
-      const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi' })
-      if (items.length > 0) {
-        console.log(`   ✅ Found 'vi' transcript (${items.length} lines)`)
-        return items.map(t => t.text).join(' ')
-      }
-    } catch (e) { }
-
-    // Attempt 2: Explicit Vietnamese (Auto-generated code often)
-    try {
-      const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'vi-VN' })
-      if (items.length > 0) {
-        console.log(`   ✅ Found 'vi-VN' transcript (${items.length} lines)`)
-        return items.map(t => t.text).join(' ')
-      }
-    } catch (e) { }
-
-    // Attempt 3: Default (usually English or 'Auto' based on server region)
-    try {
-      const items = await YoutubeTranscript.fetchTranscript(videoId)
-      if (items.length > 0) {
-        console.log(`   ✅ Found default transcript (${items.length} lines)`)
-        return items.map(t => t.text).join(' ')
-      }
-    } catch (e) {
-      console.warn(`   ⚠️ No default transcript found: ${e}`)
+    if (!YoutubeTranscript) {
+      console.warn('   ⚠️ youtube-transcript export not found; falling back to yt-dlp')
+      const fallback = await rawTranscriptFetch(videoId)
+      setCachedTranscript(videoId, fallback)
+      return fallback
     }
 
-    // Final Fallback: Attempt a raw fetch if the library keeps returning empty
-    console.log(`   🔄 Attempting raw transcript fetch fallback...`)
-    return await rawTranscriptFetch(videoId)
+    const {
+      YoutubeTranscriptTooManyRequestError,
+      YoutubeTranscriptVideoUnavailableError,
+      YoutubeTranscriptDisabledError,
+      YoutubeTranscriptNotAvailableError,
+      YoutubeTranscriptNotAvailableLanguageError,
+    } = yt
+
+    const preferredLangs = ['vi', 'vi-VN', 'en', 'en-US'] as const
+
+    const tryFetch = async (lang?: string) => {
+      const label = lang ? `youtube-transcript(${lang})` : 'youtube-transcript(default)'
+      const items = await withTimeout(
+        YoutubeTranscript.fetchTranscript(videoId, lang ? { lang } : undefined),
+        15_000,
+        label
+      )
+      if (!items?.length) return null
+      return normalizeTranscriptText(items.map(t => t.text).join('\n'))
+    }
+
+    for (const lang of preferredLangs) {
+      try {
+        const text = await tryFetch(lang)
+        if (text) {
+          console.log(`   ✅ Transcript via youtube-transcript (${lang}) (${text.length} chars)`)
+          setCachedTranscript(videoId, text)
+          return text
+        }
+      } catch (e: any) {
+        if (YoutubeTranscriptTooManyRequestError && e instanceof YoutubeTranscriptTooManyRequestError) {
+          console.warn(`   ⚠️ youtube-transcript rate-limited (captcha). Falling back to yt-dlp.`)
+          break
+        }
+        if (YoutubeTranscriptVideoUnavailableError && e instanceof YoutubeTranscriptVideoUnavailableError) {
+          console.warn(`   ⚠️ Video unavailable (${videoId})`)
+          setCachedTranscript(videoId, null)
+          return null
+        }
+        if (YoutubeTranscriptNotAvailableLanguageError && e instanceof YoutubeTranscriptNotAvailableLanguageError) {
+          continue
+        }
+        if (
+          (YoutubeTranscriptDisabledError && e instanceof YoutubeTranscriptDisabledError) ||
+          (YoutubeTranscriptNotAvailableError && e instanceof YoutubeTranscriptNotAvailableError)
+        ) {
+          // The scraper couldn't find captions in the watch HTML. yt-dlp often works when the HTML changes.
+          break
+        }
+        // Unknown error: try next language and then fall back.
+      }
+    }
+
+    // Default fetch as a last attempt (some videos only expose one language).
+    try {
+      const text = await tryFetch()
+      if (text) {
+        console.log(`   ✅ Transcript via youtube-transcript (default) (${text.length} chars)`)
+        setCachedTranscript(videoId, text)
+        return text
+      }
+    } catch (e: any) {
+      if (yt.YoutubeTranscriptTooManyRequestError && e instanceof yt.YoutubeTranscriptTooManyRequestError) {
+        console.warn(`   ⚠️ youtube-transcript rate-limited (captcha).`)
+      } else {
+        console.warn(`   ⚠️ youtube-transcript default failed: ${e?.message || String(e)}`)
+      }
+    }
+
+    console.log(`   🔄 Attempting yt-dlp transcript fallback...`)
+    const fallback = await rawTranscriptFetch(videoId)
+    setCachedTranscript(videoId, fallback)
+    return fallback
   } catch (error) {
     console.error('Error fetching transcript:', error)
+    setCachedTranscript(videoId, null)
     return null
   }
 }
@@ -231,6 +715,11 @@ async function rawTranscriptFetch(videoId: string): Promise<string | null> {
   const youtubedl = (await import('youtube-dl-exec')).default
 
   try {
+    if (!shouldIgnoreYtDlpBotBlock() && isYtDlpBotBlocked(videoId)) {
+      console.warn(`   ⚠️ Skipping yt-dlp (recent "not a bot" block for ${videoId}).`)
+      return null
+    }
+
     console.log(`   📡 Attempting transcript fetch via yt-dlp...`)
 
     // We use the library to handle the binary execution
@@ -252,22 +741,50 @@ async function rawTranscriptFetch(videoId: string): Promise<string | null> {
       process.env.YOUTUBE_DL_DIR = localBinDir;
     }
 
-    await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+    const baseOptions: Record<string, unknown> = {
       skipDownload: true,
       writeSub: true,
       writeAutoSub: true,
-      subLangs: 'vi,vi-VN,en.*',
+      subLang: 'vi,vi-VN,en.*',
       output: outputTemplate,
-      cookiesFromBrowser: 'chrome',
       noCheckCertificates: true,
       noWarnings: true,
-      preferFreeFormats: true,
-      addHeader: [
-        'referer:youtube.com',
-      ]
-    }, {
-      cwd: process.cwd()
-    } as any)
+      addHeader: ['referer:youtube.com'],
+    }
+
+    const candidates = getYtDlpAuthCandidates()
+    let sawBotCheck = false
+
+    for (const auth of candidates) {
+      try {
+        if (sawBotCheck && Object.keys(auth).length > 0) {
+          console.log(`   🔐 Retrying yt-dlp with ${describeYtDlpAuth(auth)}...`)
+        }
+        await youtubedl(url, { ...(baseOptions as any), ...(auth as any) } as any, { cwd: process.cwd() } as any)
+        sawBotCheck = false
+        break
+      } catch (e: any) {
+        const message = e?.stderr || e?.message || String(e)
+        if (isYtDlpBotCheckMessage(message)) {
+          sawBotCheck = true
+          continue
+        }
+        if (isYtDlpMissingBrowserCookiesMessage(message)) {
+          // Browser isn't installed / has no cookies DB on this machine; try next candidate.
+          continue
+        }
+        throw e
+      }
+    }
+
+    if (sawBotCheck) {
+      markYtDlpBotBlocked(videoId)
+      console.warn(
+        `⚠️ yt-dlp blocked by YouTube ("not a bot" / cookies required). Set YT_DLP_COOKIES_FROM_BROWSER=chrome (or YT_DLP_COOKIES=/path/to/cookies.txt) to enable authenticated transcript/audio.`
+      )
+      return null
+    }
 
     // yt-dlp names the file with the language suffix
     // We search for files starting with the base name we provided (but youtube-dl-exec might append params)
@@ -312,7 +829,7 @@ async function rawTranscriptFetch(videoId: string): Promise<string | null> {
       }
     }
 
-    const transcript = uniqueLines.join(' ')
+    const transcript = normalizeTranscriptText(uniqueLines.join('\n'))
     if (transcript.length > 0) {
       console.log(`   ✅ yt-dlp Fetch Success! (${transcript.length} chars)`)
       return transcript
@@ -320,7 +837,15 @@ async function rawTranscriptFetch(videoId: string): Promise<string | null> {
 
     return null
   } catch (e: any) {
-    console.warn(`⚠️ yt-dlp transcript fetch failed:`, e.message || e)
+    const message = e?.stderr || e?.message || String(e)
+    if (isYtDlpBotCheckMessage(message)) {
+      markYtDlpBotBlocked(videoId)
+      console.warn(
+        `⚠️ yt-dlp blocked by YouTube ("not a bot" / cookies required). Set YT_DLP_COOKIES_FROM_BROWSER=chrome (or YT_DLP_COOKIES=/path/to/cookies.txt) to enable authenticated transcript/audio.`
+      )
+    } else {
+      console.warn(`⚠️ yt-dlp transcript fetch failed:`, e?.message || e)
+    }
     return null
   }
 }
@@ -334,26 +859,97 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
 
+  if (!shouldIgnoreYtDlpBotBlock() && isYtDlpBotBlocked(videoId)) {
+    console.warn(`⚠️ Skipping audio transcription (yt-dlp is blocked for ${videoId}).`)
+    return null
+  }
+
   console.log(`🎙️  Transcribing audio for ${videoId}...`)
 
   const tempDir = os.tmpdir()
-  const tempFile = path.join(tempDir, `yt-${videoId}-${Date.now()}.m4a`)
+  const timestamp = Date.now()
+  const outputTemplate = path.join(tempDir, `yt-${videoId}-${timestamp}.%(ext)s`)
+  const finalAudioFile = path.join(tempDir, `yt-${videoId}-${timestamp}.m4a`)
+
   const youtubedl = (await import('youtube-dl-exec')).default
+
+  let downloadedPath: string | null = null
 
   try {
     // 1. Download Audio
     console.log(`   📡 Attempting download...`)
 
-    await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-      format: 'bestaudio[ext=m4a]',
-      output: tempFile,
-      cookiesFromBrowser: 'chrome',
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+    const baseOptions: Record<string, unknown> = {
+      extractAudio: true,
+      audioFormat: 'm4a',
+      output: outputTemplate,
       noCheckCertificates: true,
       noWarnings: true,
-    } as any) // Cast to any for cookiesFromBrowser
+    }
 
-    if (!fs.existsSync(tempFile)) {
-      throw new Error('Audio download failed (file not found)')
+    const candidates = getYtDlpAuthCandidates()
+    let sawBotCheck = false
+
+    let lastError: unknown | null = null
+    for (const auth of candidates) {
+      try {
+        if (sawBotCheck && Object.keys(auth).length > 0) {
+          console.log(`   🔐 Retrying yt-dlp with ${describeYtDlpAuth(auth)}...`)
+        }
+        await youtubedl(url, { ...(baseOptions as any), ...(auth as any) } as any)
+        sawBotCheck = false
+        lastError = null
+        break
+      } catch (e: any) {
+        lastError = e
+        const message = e?.stderr || e?.message || String(e)
+        if (isYtDlpBotCheckMessage(message)) {
+          sawBotCheck = true
+          continue
+        }
+        if (isYtDlpMissingBrowserCookiesMessage(message)) {
+          continue
+        }
+        // If yt-dlp can't decipher formats, fall back to a different downloader.
+        if (isYtDlpFormatsMissingMessage(message)) {
+          break
+        }
+        throw e
+      }
+    }
+
+    if (sawBotCheck && !shouldIgnoreYtDlpBotBlock()) {
+      markYtDlpBotBlocked(videoId)
+      console.warn(
+        `⚠️ yt-dlp blocked by YouTube ("not a bot" / cookies required). Set YT_DLP_COOKIES_FROM_BROWSER=chrome (or YT_DLP_COOKIES=/path/to/cookies.txt) to enable authenticated transcript/audio.`
+      )
+      return null
+    }
+
+    // yt-dlp may output a different extension or fail to convert; find what it actually produced.
+    const basePrefix = `yt-${videoId}-${timestamp}.`
+    const candidatesOnDisk = fs.readdirSync(tempDir)
+      .filter(f => f.startsWith(basePrefix) && !f.endsWith('.part'))
+      .map(f => path.join(tempDir, f))
+
+    downloadedPath = await findFirstExistingFile([finalAudioFile, ...candidatesOnDisk])
+
+    if (!downloadedPath) {
+      // If yt-dlp couldn't produce an audio file, try ytdl-core (works for some videos where yt-dlp fails).
+      const ytdlBase = path.join(tempDir, `yt-${videoId}-${timestamp}-ytdl`)
+      downloadedPath = await downloadAudioViaYtdlCore(videoId, ytdlBase)
+    }
+
+    if (!downloadedPath) {
+      if (lastError) throw lastError
+      return null
+    }
+
+    // Ensure m4a for Gemini upload and consistent downstream handling.
+    let uploadPath = downloadedPath
+    if (!uploadPath.endsWith('.m4a')) {
+      uploadPath = await convertAudioToM4a(uploadPath, finalAudioFile)
     }
 
     // 2. Upload to Gemini
@@ -366,7 +962,7 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
       generationConfig: GEMINI_CONFIG.generationConfig
     })
 
-    const fileBuffer = fs.readFileSync(tempFile)
+    const fileBuffer = fs.readFileSync(uploadPath)
     const base64Audio = fileBuffer.toString('base64')
 
     const result = await model.generateContent([
@@ -385,11 +981,16 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
 
   } catch (error) {
     console.error('   ❌ Transcription failed:', error)
+    const message = (error as any)?.stderr || (error as any)?.message || String(error)
+    if (isYtDlpBotCheckMessage(message)) markYtDlpBotBlocked(videoId)
     return null
   } finally {
     // Cleanup
-    if (fs.existsSync(tempFile)) {
-      try { fs.unlinkSync(tempFile) } catch { }
+    if (fs.existsSync(finalAudioFile)) {
+      try { fs.unlinkSync(finalAudioFile) } catch { }
+    }
+    if (downloadedPath && downloadedPath !== finalAudioFile && fs.existsSync(downloadedPath)) {
+      try { fs.unlinkSync(downloadedPath) } catch { }
     }
   }
 }
@@ -400,7 +1001,8 @@ export async function transcribeAudio(videoId: string): Promise<string | null> {
  */
 export async function extractRestaurantsFromTranscript(
   transcript: string,
-  videoMetadata: YouTubeVideoMetadata
+  videoMetadata: YouTubeVideoMetadata,
+  cityContext: MarketCity = detectMarketCityFromText(videoMetadata.title, videoMetadata.description, videoMetadata.channelName)
 ): Promise<RestaurantMention[]> {
   const apiKey = process.env.GEMINI_API_KEY
 
@@ -425,7 +1027,8 @@ export async function extractRestaurantsFromTranscript(
     You are an expert food critic and data extractor.
     Analyze the following YouTube video transcript and metadata to extract restaurant information.
 
-    Target: Vietnamese food review video in Da Nang or Vietnam.
+    Market focus: Vietnam and Singapore.
+    Target city: ${cityContext.name}, ${cityContext.country}.
 
     CRITICAL RULES:
     1. STRICT FACTUAL EXTRACTION: ONLY extract information EXPLICITLY mentioned in the transcript or title/description.
@@ -434,11 +1037,11 @@ export async function extractRestaurantsFromTranscript(
     4. FILTER NON-REVIEWS: DO NOT extract a restaurant if the reviewer visited it but could not eat there (e.g., it was closed, sold out, too crowded) and therefore provided no opinion on the food.
     5. ABSENT DATA: If specific praise/criticism is missing but they DID eat there, leave the 'notes' field empty or use a brief factual statement.
     6. PRECISION: Be extremely precise with restaurant names.
-    7. AUTHENTIC VIETNAMESE ONLY: Strictly extract ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if они are located in Vietnam.
+    7. AUTHENTIC LOCAL ONLY: Extract authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
 
     Extract a JSON array of restaurants mentioned. Each object should have:
     - name: The name of the restaurant or food stall. Be precise.
-    - address: The address if mentioned (or "Da Nang" if inferred but not specific).
+    - address: The address if mentioned (or "${cityContext.name}" if inferred but not specific).
     - dishes: Array of dishes explicitly recommended or eaten there.
     - priceRange: Estimation based ONLY on context ("$" = cheap street food, "$$" = casual, "$$$" = upscale).
     - notes: Detailed summary of the reviewer's actual experience found in the text. Include atmosphere, specific praise/criticism of food, and why they recommend it.
@@ -453,7 +1056,7 @@ export async function extractRestaurantsFromTranscript(
     ${transcript.substring(0, 50000)}
     `
 
-    const result = await model.generateContent(prompt)
+    const result = await generateContentWithRetry(model, prompt, { maxAttempts: 4 })
     const response = await result.response
     const text = response.text()
 
@@ -500,7 +1103,8 @@ export async function extractRestaurantsFromTranscript(
  * Parses timestamp patterns like "0:54 Mỳ Quảng Nhung" or "2:15 Bún cá 109"
  */
 export function extractRestaurantsFromDescriptionRegex(
-  metadata: YouTubeVideoMetadata
+  metadata: YouTubeVideoMetadata,
+  cityContext: MarketCity = detectMarketCityFromText(metadata.title, metadata.description, metadata.channelName)
 ): RestaurantMention[] {
   if (!metadata.description || metadata.description.length < 30) {
     return []
@@ -554,7 +1158,7 @@ export function extractRestaurantsFromDescriptionRegex(
 
     restaurants.push({
       name,
-      address: 'Da Nang',
+      address: cityContext.name,
       dishes,
       priceRange: '$',
       notes: `Featured at ${match[1]}:${match[2]}${match[3] ? ':' + match[3] : ''} in the video`,
@@ -570,7 +1174,8 @@ export function extractRestaurantsFromDescriptionRegex(
  * Fallback when transcript is not available
  */
 export async function extractRestaurantsFromDescription(
-  metadata: YouTubeVideoMetadata
+  metadata: YouTubeVideoMetadata,
+  cityContext: MarketCity = detectMarketCityFromText(metadata.title, metadata.description, metadata.channelName)
 ): Promise<RestaurantMention[]> {
   // Check if description has meaningful content
   if (!metadata.description || metadata.description.length < 50) {
@@ -579,7 +1184,7 @@ export async function extractRestaurantsFromDescription(
   }
 
   // First try regex-based extraction (always works, no API needed)
-  const regexResults = extractRestaurantsFromDescriptionRegex(metadata)
+  const regexResults = extractRestaurantsFromDescriptionRegex(metadata, cityContext)
 
   if (regexResults.length > 0) {
     console.log(`✅ Extracted ${regexResults.length} restaurants from description using regex`)
@@ -611,10 +1216,10 @@ export async function extractRestaurantsFromDescription(
     2. NO META-TALK: DO NOT use phrases like "safest bet", "likely", or "assuming".
     3. EXCLUDE CLOSED PLACES: If the description mentions a place was closed or they couldn't eat there, do not include it.
     4. FACTUAL ONLY: If the description doesn't explicitly describe the taste or experience, leave the 'notes' field empty or factual.
-    5. AUTHENTIC VIETNAMESE ONLY: Strictly extract ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if they are located in Vietnam.
+    5. AUTHENTIC LOCAL ONLY: Extract authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
 
     Analyze the following YouTube video title and description to extract ALL restaurants/food places mentioned.
-    This is a Vietnamese food review video, so names may be in Vietnamese.
+    This is a food review video in Vietnam or Singapore, so names may be in Vietnamese or English.
 
     Look for:
     - Restaurant names in timestamp listings (e.g., "0:54 Mỳ Quảng Nhung")
@@ -623,7 +1228,7 @@ export async function extractRestaurantsFromDescription(
 
     Extract a JSON array where each object has:
     - name: The exact name of the restaurant/food stall (e.g., "Mỳ Quảng Nhung", "Bún cá 109")
-    - address: "Da Nang" (since this is a Da Nang food tour)
+    - address: "${cityContext.name}" (target city fallback if exact address is not mentioned)
     - dishes: Infer the main dish from the name if possible (e.g., "Mỳ Quảng" for "Mỳ Quảng Nhung").
     - priceRange: "$" for street food (default assumption for these types of videos)
     - notes: Brief factual note about what type of food they serve.
@@ -632,11 +1237,12 @@ export async function extractRestaurantsFromDescription(
     Return ONLY the JSON array. If no restaurants are identified, return [].
 
     Video Title: ${metadata.title}
+    Target city: ${cityContext.name}, ${cityContext.country}
     Video Description:
     ${metadata.description}
     `
 
-    const result = await model.generateContent(prompt)
+    const result = await generateContentWithRetry(model, prompt, { maxAttempts: 4 })
     const response = await result.response
     const text = response.text()
 
@@ -694,6 +1300,14 @@ export async function parseYouTubeVideo(url: string): Promise<{
     throw new Error('❌ Could not fetch video metadata. Check YOUTUBE_API_KEY.')
   }
 
+  const inferredCity = detectMarketCityFromText(
+    metadata.title,
+    metadata.description,
+    metadata.channelName,
+    url
+  )
+  console.log(`📍 Inferred city context: ${inferredCity.name}, ${inferredCity.country}`)
+
   // Get transcript
   console.log(`fetching transcript for video: ${videoId}`)
   let transcript = await getVideoTranscript(videoId)
@@ -708,11 +1322,15 @@ export async function parseYouTubeVideo(url: string): Promise<{
   if (transcript) {
     // Extract restaurants from transcript
     console.log('Extracting restaurants from transcript...')
-    restaurants = await extractRestaurantsFromTranscript(transcript, metadata)
+    restaurants = await extractRestaurantsFromTranscript(transcript, metadata, inferredCity)
+    if (restaurants.length === 0) {
+      console.log('⚠️ No restaurants extracted from transcript. Trying description fallback...')
+      restaurants = await extractRestaurantsFromDescription(metadata, inferredCity)
+    }
   } else {
     // Fallback: try to extract from video description
     console.log('⚠️ Transcript not available. Fallback to Description...')
-    restaurants = await extractRestaurantsFromDescription(metadata)
+    restaurants = await extractRestaurantsFromDescription(metadata, inferredCity)
   }
 
   return { metadata, restaurants }

@@ -13,7 +13,7 @@ const args = process.argv.slice(2)
 async function main() {
   console.log('🔍 Authentik Content Discovery Worker\n')
 
-  const query = args[0] || 'Da Nang street food'
+  const query = args[0] || 'Vietnam and Singapore street food'
 
   console.log(`Searching for: "${query}"...`)
 

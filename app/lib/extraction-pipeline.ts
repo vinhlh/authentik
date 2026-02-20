@@ -12,6 +12,12 @@ import {
   selectBestPhotos,
   type PlaceDetails,
 } from './api/google-places'
+import {
+  detectMarketCityFromText,
+  getCityLocationBias,
+  replaceCollectionCityTags,
+  type MarketCity,
+} from './market-cities'
 import { supabase } from './supabase'
 import { processRestaurantPhotos, createSlug } from './photo-pipeline'
 
@@ -31,6 +37,9 @@ export interface ExtractionResult {
     description_en?: string | null
     creator_name: string
     source_url: string
+    source_channel_id?: string | null
+    source_channel_url?: string | null
+    source_channel_name?: string | null
   }
   restaurants: Array<{
     mention: RestaurantMention
@@ -70,7 +79,13 @@ export async function extractFromVideo(
   console.log(`📹 Extracting from ${platform} video: ${url}`)
 
   // Parse video based on platform
-  let metadata: { title?: string; description?: string } | null = null
+  let metadata: {
+    title?: string
+    description?: string
+    channelName?: string
+    channelId?: string
+    authorName?: string
+  } | null = null
   let restaurants: RestaurantMention[]
 
   if (platform === 'youtube') {
@@ -84,13 +99,36 @@ export async function extractFromVideo(
   }
 
   console.log(`✅ Found ${restaurants.length} restaurant mentions`)
+  const targetCity = detectMarketCityFromText(
+    metadata?.title,
+    metadata?.description,
+    ...restaurants.slice(0, 5).map(r => r.address),
+    url
+  )
+  console.log(`🌏 Market focus: ${targetCity.name}, ${targetCity.country}`)
+
+  const sourceChannelId =
+    platform === 'youtube'
+      ? (metadata?.channelId || null)
+      : null
+  const sourceChannelName =
+    platform === 'youtube'
+      ? (metadata?.channelName || creatorName)
+      : platform === 'tiktok'
+        ? (metadata?.authorName || creatorName)
+        : creatorName
+  const sourceChannelUrl =
+    platform === 'youtube' && sourceChannelId
+      ? `https://www.youtube.com/channel/${sourceChannelId}`
+      : null
 
   // --- OPTIMIZED: Unified AI Extraction ---
   console.log(`🧠 AI Processing: Generating unified collection details and reviews...`)
   let unifiedData = await generateUnifiedExtraction(
     metadata || { title: '', description: '' },
     restaurants,
-    creatorName
+    creatorName,
+    targetCity
   )
 
   // Use AI data or fallbacks
@@ -109,6 +147,9 @@ export async function extractFromVideo(
     description_en?: string | null;
     creator_name?: string;
     source_url?: string;
+    source_channel_id?: string | null;
+    source_channel_url?: string | null;
+    source_channel_name?: string | null;
   }
 
   if (dry) {
@@ -116,6 +157,9 @@ export async function extractFromVideo(
       id: 'dry-run-preview',
       name: collectionName,
       name_vi: collectionName,
+      source_channel_id: sourceChannelId,
+      source_channel_url: sourceChannelUrl,
+      source_channel_name: sourceChannelName,
     }
     console.log(`📝 Would create collection: ${collection.name}`)
     if (nameEn) console.log(`   (EN): ${nameEn}`)
@@ -152,17 +196,23 @@ export async function extractFromVideo(
 
     if (existingCollection) {
       console.log(`🔄 Found existing collection: ${existingCollection.name_vi || existingCollection.name}`)
+      const updatePayload: Record<string, unknown> = {
+        name_vi: collectionName, // Update name if video title changed
+        description_vi: collectionDescription,
+        name_en: nameEn,
+        description_en: descriptionEn,
+        creator_name: creatorName,
+        source_channel_name: sourceChannelName,
+        // Keep non-city tags but enforce a single canonical city tag set.
+        tags: replaceCollectionCityTags(existingCollection.tags, targetCity),
+      }
+      if (sourceChannelId) updatePayload.source_channel_id = sourceChannelId
+      if (sourceChannelUrl) updatePayload.source_channel_url = sourceChannelUrl
+
       // Update existing
       const { data: updated, error: updateError } = await supabase
         .from('collections')
-        .update({
-          name_vi: collectionName, // Update name if video title changed
-          description_vi: collectionDescription,
-          name_en: nameEn,
-          description_en: descriptionEn,
-          creator_name: creatorName,
-          // Don't update source_url as it matched
-        })
+        .update(updatePayload)
         .eq('id', existingCollection.id)
         .select()
         .single()
@@ -183,6 +233,10 @@ export async function extractFromVideo(
           description_en: descriptionEn,
           creator_name: creatorName,
           source_url: url,
+          source_channel_id: sourceChannelId,
+          source_channel_url: sourceChannelUrl,
+          source_channel_name: sourceChannelName,
+          tags: replaceCollectionCityTags(null, targetCity),
         })
         .select()
         .single()
@@ -210,7 +264,10 @@ export async function extractFromVideo(
       console.log(`🔍 Verifying: ${mention.name}`)
 
       // Verify with Google Places
-      const verified = await verifyRestaurant(mention.name, mention.address)
+      const verified = await verifyRestaurant(mention.name, mention.address, {
+        locationBias: getCityLocationBias(targetCity),
+        cityName: targetCity.name,
+      })
 
       if (!verified) {
         console.log(`❌ Could not verify: ${mention.name}`)
@@ -292,7 +349,7 @@ export async function extractFromVideo(
 
             // We use the verified place details which has the photos array
             await processRestaurantPhotos(verified, collectionSlug, 3, 10, {
-              skipEnhancement: false // Set to true if too slow/expensive
+              skipEnhancement: true // Set to true if too slow/expensive
             })
           } catch (photoError) {
             console.error(`   ⚠️ Photo processing failed for ${verified.name}:`, photoError)
@@ -333,6 +390,9 @@ export async function extractFromVideo(
       name: collection.name_vi || collection.name,
       creator_name: creatorName,
       source_url: url,
+      source_channel_id: collection.source_channel_id || sourceChannelId || null,
+      source_channel_url: collection.source_channel_url || sourceChannelUrl || null,
+      source_channel_name: collection.source_channel_name || sourceChannelName || creatorName,
     },
     restaurants: results,
     stats,
@@ -601,7 +661,8 @@ export async function batchExtract(
 async function generateUnifiedExtraction(
   metadata: { title?: string; description?: string },
   restaurants: RestaurantMention[],
-  creatorName: string
+  creatorName: string,
+  targetCity: MarketCity
 ): Promise<{
   collection: {
     name_vi: string;
@@ -636,6 +697,8 @@ async function generateUnifiedExtraction(
 
     Input Data:
     - Creator: "${creatorName}"
+    - Market focus: Vietnam and Singapore
+    - Target city: "${targetCity.name}, ${targetCity.country}"
     - Video Title: "${metadata.title || ''}"
     - Description: "${(metadata.description || '').substring(0, 1000)}"
     - Restaurants:
@@ -665,7 +728,7 @@ ${listings}
     - VI summary must be in VIETNAMESE.
     - BANNED WORDS: Do NOT use "hấp dẫn", "ngon", "tuyệt vời", "đậm đà" universally. Use specific sensory words (e.g. "giòn rụm", "thanh ngọt", "béo ngậy", "thơm nức").
     - VARIETY: Ensure each review uses DIFFERENT adjectives.
-    - AUTHENTIC VIETNAMESE ONLY: Strictly include ONLY authentic Vietnamese food/restaurants. EXCLUDE Korean BBQ, Thai food, Japanese sushi, Western bakeries, and any other non-Vietnamese cuisines even if they are featured in the video.
+    - AUTHENTIC LOCAL ONLY: Keep authentic local cuisine for the target city. For Vietnam cities, keep Vietnamese dishes. For Singapore, keep local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
 
     Output JSON Schema:
     {

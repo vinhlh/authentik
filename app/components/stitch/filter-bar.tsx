@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
 
 const FILTERS = [
   "All",
@@ -14,12 +15,16 @@ const FILTERS = [
 
 export function FilterBar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
 
   const handleFilterClick = (filter: string) => {
     if (filter === "All") {
-      router.push("/collections");
+      router.push(withCityParam("/collections", cityId));
     } else {
-      router.push(`/collections?tag=${encodeURIComponent(filter)}`);
+      const href = `/collections?tag=${encodeURIComponent(filter)}`;
+      router.push(withCityParam(href, cityId));
     }
   };
 

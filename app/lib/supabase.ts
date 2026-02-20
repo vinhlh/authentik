@@ -47,6 +47,9 @@ export type Collection = {
   creator_id: string | null
   creator_name: string | null
   source_url: string | null
+  source_channel_id: string | null
+  source_channel_url: string | null
+  source_channel_name: string | null
   tags: string[] | null
   created_at: string
 }

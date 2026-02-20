@@ -3,13 +3,15 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { MapPin } from 'lucide-react'
 import type { Collection } from '@/lib/supabase'
+import { withCityParam } from '@/lib/city-url'
 
 interface CollectionCardProps {
   collection: Collection
   restaurantCount?: number
+  cityId?: string | null
 }
 
-export function CollectionCard({ collection, restaurantCount = 0 }: CollectionCardProps) {
+export function CollectionCard({ collection, restaurantCount = 0, cityId = null }: CollectionCardProps) {
   const { id, name, description, creator_name } = collection
 
   // Get initials for avatar fallback
@@ -24,7 +26,7 @@ export function CollectionCard({ collection, restaurantCount = 0 }: CollectionCa
   }
 
   return (
-    <Link href={`/collections/${id}`}>
+    <Link href={withCityParam(`/collections/${id}`, cityId)}>
       <Card className="overflow-hidden transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer h-full">
         {/* Cover Image - Placeholder for now */}
         <div className="relative aspect-square bg-gradient-to-br from-primary-light to-primary">
