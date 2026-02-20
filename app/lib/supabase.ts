@@ -44,6 +44,8 @@ export type Restaurant = {
 export type Collection = {
   id: string
   url_key?: string | null
+  is_visible?: boolean
+  display_rank?: number | null
   name: string
   name_vi?: string | null
   name_en?: string | null

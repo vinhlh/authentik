@@ -12,6 +12,7 @@
     "extract:batch": "tsx workers/extract.ts batch",
     "discover": "tsx workers/discover.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "collections:rank": "tsx scripts/rank-collections.ts",
     "test": "vitest"
   },
   "dependencies": {

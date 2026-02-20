@@ -43,6 +43,8 @@ export default async function HomePage({
     let collectionsQuery = supabase
       .from('collections')
       .select('*, collection_restaurants(count), tags')
+      .eq('is_visible', true)
+      .order('display_rank', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     if (cityTags.length > 0) {

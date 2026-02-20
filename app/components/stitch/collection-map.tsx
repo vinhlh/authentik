@@ -3,11 +3,8 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import Map, { Marker, NavigationControl, GeolocateControl, ViewStateChangeEvent, GeolocateResultEvent, MapRef } from 'react-map-gl/mapbox';
 import mapboxgl from 'mapbox-gl';
-import { MapPin, Navigation } from 'lucide-react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Restaurant } from './restaurant-card';
-import { useLanguage } from '@/lib/i18n-context';
-import { calculateDistance } from '@/lib/utils/distance';
 
 // Mapbox token should be in environment variables
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -23,34 +20,53 @@ interface CollectionMapProps {
 }
 
 export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate, hoveredRestaurantId, onHoverRestaurant, onSelectRestaurant, showLabels = false }: CollectionMapProps) {
-  const { t } = useLanguage();
   const [viewState, setViewState] = useState({
     longitude: 108.2022, // Da Nang default
     latitude: 16.0544,
     zoom: 12
   });
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
 
   // Calculate bounds to fit all markers
   const mapRef = useRef<MapRef>(null);
+  const validCoords = useMemo(
+    () => restaurants
+      .map((r) => r.coordinates)
+      .filter((c): c is { lat: number, lng: number } =>
+        !!c &&
+        Number.isFinite(c.lat) &&
+        Number.isFinite(c.lng) &&
+        Math.abs(c.lat) <= 90 &&
+        Math.abs(c.lng) <= 180
+      ),
+    [restaurants]
+  );
 
   // Fit bounds to show all markers
   useEffect(() => {
-    if (restaurants.length > 0 && mapRef.current) {
-      const validCoords = restaurants
-        .map(r => r.coordinates)
-        .filter((c): c is { lat: number, lng: number } => c !== undefined && c !== null);
-
-      if (validCoords.length > 0) {
-        const bounds = new mapboxgl.LngLatBounds();
-        validCoords.forEach(c => bounds.extend([c.lng, c.lat]));
-
-        mapRef.current.fitBounds(bounds, {
-          padding: 60,
-          duration: 1000
-        });
-      }
+    if (!isMapLoaded || !mapRef.current || validCoords.length === 0) {
+      return;
     }
-  }, [restaurants]);
+
+    if (validCoords.length === 1) {
+      const single = validCoords[0];
+      mapRef.current.flyTo({
+        center: [single.lng, single.lat],
+        zoom: 14,
+        duration: 1000
+      });
+      return;
+    }
+
+    const bounds = new mapboxgl.LngLatBounds();
+    validCoords.forEach(c => bounds.extend([c.lng, c.lat]));
+
+    mapRef.current.fitBounds(bounds, {
+      padding: 60,
+      duration: 1000,
+      maxZoom: 14
+    });
+  }, [isMapLoaded, validCoords]);
 
   const pins = useMemo(() => restaurants.map((restaurant, index) => {
     if (!restaurant.coordinates) return null;
@@ -106,6 +122,7 @@ export function CollectionMap({ restaurants, userLocation, onUserLocationUpdate,
         ref={mapRef}
         {...viewState}
         onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
+        onLoad={() => setIsMapLoaded(true)}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         mapboxAccessToken={MAPBOX_TOKEN}
