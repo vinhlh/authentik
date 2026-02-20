@@ -360,7 +360,7 @@ export async function extractFromVideo(
               const collectionSlug = createSlug(collection.name_vi || collection.name)
 
               // We use the verified place details which has the photos array
-              const photoResults = await processRestaurantPhotos(verified, collectionSlug, 3, 10, {
+              const photoResults = await processRestaurantPhotos(verified, collectionSlug, 3, 3, {
                 skipAnalysis: true,
                 skipEnhancement: true // Set to true if too slow/expensive
               })

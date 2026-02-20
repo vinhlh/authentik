@@ -969,7 +969,7 @@ export async function extractRestaurantsFromTranscript(
     ${transcript.substring(0, 50000)}
     `
 
-    const result = await generateContentWithRetry(model, prompt, { maxAttempts: 4 })
+    const result = await generateContentWithRetry(model, prompt, { maxAttempts: 2 })
     const response = await result.response
     const text = response.text()
 
@@ -1155,7 +1155,7 @@ export async function extractRestaurantsFromDescription(
     ${metadata.description}
     `
 
-    const result = await generateContentWithRetry(model, prompt, { maxAttempts: 4 })
+    const result = await generateContentWithRetry(model, prompt, { maxAttempts: 2 })
     const response = await result.response
     const text = response.text()
 

@@ -8,7 +8,7 @@ export const revalidate = 3600 // Refresh sitemap every hour
 type CollectionSitemapRow = {
   id: string
   url_key?: string | null
-  updated_at?: string | null
+  created_at?: string | null
   source_channel_id?: string | null
   source_channel_name?: string | null
 }
@@ -16,7 +16,7 @@ type CollectionSitemapRow = {
 type RestaurantSitemapRow = {
   id: string
   url_key?: string | null
-  updated_at?: string | null
+  created_at?: string | null
 }
 
 function toAbsoluteUrl(baseUrl: string, path: string): string {
@@ -35,11 +35,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [collectionsResult, restaurantsResult] = await Promise.all([
     supabase
       .from('collections')
-      .select('id, url_key, updated_at, source_channel_id, source_channel_name')
+      .select('id, url_key, created_at, source_channel_id, source_channel_name')
       .eq('is_visible', true),
     supabase
       .from('restaurants')
-      .select('id, url_key, updated_at'),
+      .select('id, url_key, created_at'),
   ])
 
   if (collectionsResult.error) {
@@ -69,14 +69,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const collectionUrls = collections.map((collection) => ({
     url: toAbsoluteUrl(baseUrl, `/collections/${getUrlKey(collection)}`),
-    lastModified: toLastModified(collection.updated_at),
+    lastModified: toLastModified(collection.created_at),
     changeFrequency: 'weekly' as const,
     priority: 0.8,
   }))
 
   const restaurantUrls = restaurants.map((restaurant) => ({
     url: toAbsoluteUrl(baseUrl, `/restaurants/${getUrlKey(restaurant)}`),
-    lastModified: toLastModified(restaurant.updated_at),
+    lastModified: toLastModified(restaurant.created_at),
     changeFrequency: 'monthly' as const,
     priority: 0.6,
   }))
@@ -91,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!channelSlug) continue
 
     const channelUrl = toAbsoluteUrl(baseUrl, `/channels/${encodeURIComponent(channelSlug)}`)
-    const lastModified = toLastModified(collection.updated_at)
+    const lastModified = toLastModified(collection.created_at)
     const previous = channelMap.get(channelUrl)
 
     if (!previous || lastModified > previous) {
