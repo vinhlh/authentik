@@ -595,3 +595,135 @@ No results found for: L' Etoile Restaurant Hai Bà Trưng street, near Điện B
    📥 Downloading 10 candidate photos...
    ✅ Downloaded 10/10 photos
    🤖 AI analyzing 10 photos...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 7
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/RqcGmX9_1_tM-7.jpg
+   ⏩ Skipping enhancement for photo 9
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/RqcGmX9_1_tM-9.jpg
+   ⏩ Skipping enhancement for photo 1
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/RqcGmX9_1_tM-1.jpg
+   📸 Photos: 10 saved, 0 enhanced
+🔍 Verifying: Topping Beef Diamond
+✅ Verified: Topping Beef Diamond
+   ✨ Creating new restaurant: Topping Beef Diamond
+   ✨ AI Review (VI): "Súp nấm thơm, vịt nướng mềm, giá cả phải chăng."
+   📸 Processing photos for: Topping Beef Diamond...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 3
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/RK1JsM0YBt7M-3.jpg
+   ⏩ Skipping enhancement for photo 8
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/RK1JsM0YBt7M-8.jpg
+   ⏩ Skipping enhancement for photo 0
+   ☁️  Uploaded original: nha-hang-au-khu-trung-tam-sai-gon-cua-nguyen-quang/RK1JsM0YBt7M-0.jpg
+   📸 Photos: 10 saved, 0 enhanced
+
+📊 Extraction complete:
+   Total mentions: 5
+   Verified: 4
+   Imported: 4
+   Failed: 1
+
+============================================================
+Processing: https://www.youtube.com/watch?v=vTKYZPuB7F0
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=vTKYZPuB7F0
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ho Chi Minh City, Vietnam
+fetching transcript for video: vTKYZPuB7F0
+   ✅ Transcript via external service (13733 chars)
+Extracting restaurants from transcript...
+✅ Found 1 restaurant mentions
+🌏 Market focus: Ho Chi Minh City, Vietnam
+🧠 AI Processing: Generating unified collection details and reviews...
+🚀 Sending Unified Gemini Request...
+⏳ AI Rate limit hit. Retrying in 15s...
+⏳ AI Rate limit hit. Retrying in 30s...
+✅ Unified Data Extracted Successfully
+📝 Created collection: Món Chay tại Hồ Chí Minh với Nguyễn Quang Dũng
+🔍 Verifying: quán An
+✅ Verified: Ms. Barun Restaurant
+   ✨ Creating new restaurant: Ms. Barun Restaurant
+   ✨ AI Review (VI): "Món chay fusion đa dạng, hương vị Thái, Mexico, Trung Quốc. Giá cả hợp lý."
+   📸 Processing photos for: Ms. Barun Restaurant...
+   🧹 Cleaning up old photos...
+   📥 Downloading 10 candidate photos...
+   ✅ Downloaded 10/10 photos
+   🤖 AI analyzing 10 photos...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   ⏳ Rate limited (photo analysis), retry 1/5 in 2s...
+   ⏳ Rate limited (photo analysis), retry 2/5 in 4s...
+   ⏳ Rate limited (photo analysis), retry 3/5 in 8s...
+   🏆 Selected top 3 photos for processing
+   ⏩ Skipping enhancement for photo 1
+   ☁️  Uploaded original: mon-chay-tai-ho-chi-minh-voi-nguyen-quang-dung/RWeujRr6oAzo-1.jpg
+   ⏩ Skipping enhancement for photo 9
+   ☁️  Uploaded original: mon-chay-tai-ho-chi-minh-voi-nguyen-quang-dung/RWeujRr6oAzo-9.jpg
+   ⏩ Skipping enhancement for photo 8
+   ☁️  Uploaded original: mon-chay-tai-ho-chi-minh-voi-nguyen-quang-dung/RWeujRr6oAzo-8.jpg
+   📸 Photos: 10 saved, 0 enhanced
+
+📊 Extraction complete:
+   Total mentions: 1
+   Verified: 1
+   Imported: 1
+   Failed: 0
+
+============================================================
+Processing: https://www.youtube.com/watch?v=TAhfFU_ZoNA
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=TAhfFU_ZoNA
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Da Nang, Vietnam
+fetching transcript for video: TAhfFU_ZoNA
+   ✅ Transcript via external service (51387 chars)
+Extracting restaurants from transcript...
+⚠️ No restaurants extracted from transcript. Trying description fallback...
+✅ Extracted 6 restaurants from description using regex
+✅ Found 6 restaurant mentions
+🌏 Market focus: Da Nang, Vietnam
+🧠 AI Processing: Generating unified collection details and reviews...
+🚀 Sending Unified Gemini Request...
+✅ Unified Data Extracted Successfully
+
+============================================================
+Processing: https://www.youtube.com/watch?v=e5TF_T0G1A4
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=e5TF_T0G1A4
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ha Noi, Vietnam
+fetching transcript for video: e5TF_T0G1A4
+
+============================================================
+Processing: https://www.youtube.com/watch?v=HFVOYDMj0bc
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=HFVOYDMj0bc
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ha Noi, Vietnam
+fetching transcript for video: HFVOYDMj0bc
+
+============================================================
+Processing: https://www.youtube.com/watch?v=4SV2S6mDCQk
+============================================================
+
+📹 Extracting from youtube video: https://www.youtube.com/watch?v=4SV2S6mDCQk
+🔑 Using YouTube API Key: AIza...
+📍 Inferred city context: Ho Chi Minh City, Vietnam
+fetching transcript for video: 4SV2S6mDCQk
+   ✅ Transcript via external service (64907 chars)
+Extracting restaurants from transcript...
+⚠️ No restaurants extracted from transcript. Trying description fallback...
+✅ Extracted 7 restaurants from description using regex
+✅ Found 7 restaurant mentions
+🌏 Market focus: Ho Chi Minh City, Vietnam
+🧠 AI Processing: Generating unified collection details and reviews...
+🚀 Sending Unified Gemini Request...
+⏳ AI Rate limit hit. Retrying in 15s...
+⏳ AI Rate limit hit. Retrying in 30s...
