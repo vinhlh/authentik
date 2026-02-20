@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { MapPin } from 'lucide-react'
 import type { Collection } from '@/lib/supabase'
 import { withCityParam } from '@/lib/city-url'
+import { getUrlKey } from '@/lib/url-keys'
 
 interface CollectionCardProps {
   collection: Collection
@@ -12,7 +13,7 @@ interface CollectionCardProps {
 }
 
 export function CollectionCard({ collection, restaurantCount = 0, cityId = null }: CollectionCardProps) {
-  const { id, name, description, creator_name } = collection
+  const { name, description, creator_name } = collection
 
   // Get initials for avatar fallback
   const getInitials = (name: string | null) => {
@@ -26,7 +27,7 @@ export function CollectionCard({ collection, restaurantCount = 0, cityId = null 
   }
 
   return (
-    <Link href={withCityParam(`/collections/${id}`, cityId)}>
+    <Link href={withCityParam(`/collections/${getUrlKey(collection)}`, cityId)}>
       <Card className="overflow-hidden transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer h-full">
         {/* Cover Image - Placeholder for now */}
         <div className="relative aspect-square bg-gradient-to-br from-primary-light to-primary">

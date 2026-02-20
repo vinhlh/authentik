@@ -62,9 +62,19 @@ export function Header() {
     setStoredCityId(id);
     setIsCityDropdownOpen(false);
 
+    const basePath = stripCityPrefix(pathname);
+    const shouldRedirectToCityHome = basePath !== "/";
+
+    if (shouldRedirectToCityHome) {
+      const homeForCity = id === DEFAULT_MARKET_CITY.id
+        ? "/"
+        : withCityParam("/", id);
+      router.push(homeForCity, { scroll: false });
+      return;
+    }
+
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete("city");
-    const basePath = stripCityPrefix(pathname);
     const nextQuery = nextParams.toString();
     const baseHref = nextQuery ? `${basePath}?${nextQuery}` : basePath;
     const nextHref = id === DEFAULT_MARKET_CITY.id

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/stitch/header";
 import { Footer } from "@/components/stitch/footer";
+import { Suspense } from "react";
 
 const inter = Inter({
   subsets: ["latin", "vietnamese"],
@@ -74,8 +75,12 @@ export default function RootLayout({
           <LocationProvider>
             <Providers>
               <div className="layout-container flex flex-col">
-                <Header />
-                {children}
+                <Suspense fallback={null}>
+                  <Header />
+                </Suspense>
+                <Suspense fallback={null}>
+                  {children}
+                </Suspense>
                 <Footer />
               </div>
               <FriendlyLocationRequest />

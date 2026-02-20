@@ -5,6 +5,7 @@ import { approveSuggestion, rejectSuggestion, reprocessSuggestion } from "./acti
 import { CheckCircle, XCircle, Loader2, ExternalLink, FileText, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { getUrlKey } from "@/lib/url-keys";
 
 // Admin Client Component
 export default function AdminDashboard() {
@@ -37,7 +38,8 @@ export default function AdminDashboard() {
       .from('video_suggestions')
       .select(`
         *,
-        profiles:user_id (email, full_name)
+        profiles:user_id (email, full_name),
+        result_collection:collections!video_suggestions_result_collection_id_fkey (id, url_key)
       `)
       .order('created_at', { ascending: false });
 
@@ -113,7 +115,11 @@ export default function AdminDashboard() {
                   </span>
                   {s.status === 'completed' && s.result_collection_id && (
                     <div className="mt-1">
-                      <a href={`/collections/${s.result_collection_id}`} target="_blank" className="text-xs text-blue-600 hover:underline">
+                      <a
+                        href={`/collections/${s.result_collection ? getUrlKey(s.result_collection) : s.result_collection_id}`}
+                        target="_blank"
+                        className="text-xs text-blue-600 hover:underline"
+                      >
                         View Result
                       </a>
                     </div>

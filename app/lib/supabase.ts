@@ -18,6 +18,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
  */
 export type Restaurant = {
   id: string
+  url_key?: string | null
   google_place_id: string | null
   name: string
   address: string | null
@@ -42,8 +43,13 @@ export type Restaurant = {
 
 export type Collection = {
   id: string
+  url_key?: string | null
   name: string
+  name_vi?: string | null
+  name_en?: string | null
   description: string | null
+  description_vi?: string | null
+  description_en?: string | null
   creator_id: string | null
   creator_name: string | null
   source_url: string | null

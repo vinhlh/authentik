@@ -68,6 +68,7 @@ export default async function HomePage({
     if (!restaurantsError && restaurantsData) {
       restaurants = restaurantsData.map((r: any) => ({
         id: r.id,
+        url_key: r.url_key,
         name: r.name,
         // Use authenticity score to mock rating if actual rating (cache) is missing
         rating: r.authenticity_score ? Number((3 + r.authenticity_score * 2).toFixed(1)) : 4.5,

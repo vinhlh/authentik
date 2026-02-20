@@ -17,6 +17,7 @@ interface CollectionHeaderProps {
     description_en?: string | null;
     creator_name?: string | null;
     source_url?: string;
+    source_channel_id?: string | null;
     source_channel_url?: string | null;
     source_channel_name?: string | null;
   };
@@ -30,6 +31,20 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
   const searchParams = useSearchParams();
   const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
   const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const channelKey = collection.source_channel_id || collection.source_channel_name;
+  const channelPageHref = (() => {
+    if (!channelKey) return null;
+    const params = new URLSearchParams();
+    if (collection.source_channel_name) {
+      params.set("name", collection.source_channel_name);
+    }
+    if (collection.source_channel_url) {
+      params.set("url", collection.source_channel_url);
+    }
+    const basePath = `/channels/${encodeURIComponent(channelKey)}`;
+    const href = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+    return withCityParam(href, cityId);
+  })();
 
   const hasImage = !!coverImage;
 
@@ -98,7 +113,14 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
                 ▶ Watch Video
               </a>
             )}
-            {collection.source_channel_url && (
+            {channelPageHref ? (
+              <Link
+                href={channelPageHref}
+                className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 hover:bg-white/30 transition-colors text-sm font-semibold text-white border border-white/20 w-fit"
+              >
+                {collection.source_channel_name ? `Channel: ${collection.source_channel_name}` : 'View Channel'}
+              </Link>
+            ) : collection.source_channel_url ? (
               <a
                 href={collection.source_channel_url}
                 target="_blank"
@@ -107,7 +129,7 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
               >
                 {collection.source_channel_name ? `Channel: ${collection.source_channel_name}` : 'View Channel'}
               </a>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

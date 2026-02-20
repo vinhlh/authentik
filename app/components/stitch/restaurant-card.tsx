@@ -10,9 +10,11 @@ import { supabase } from "@/lib/supabase";
 import { LoginModal } from "@/components/auth/login-modal";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
+import { getUrlKey } from "@/lib/url-keys";
 
 export interface Restaurant {
   id: string;
+  url_key?: string | null;
   name: string;
   rating: number;
   location: string;
@@ -115,7 +117,7 @@ export function RestaurantCard({
     ? (restaurant.reviewSummaryVi || restaurant.reviewSummary)
     : (restaurant.reviewSummary || restaurant.reviewSummaryVi);
   const restaurantHref = withCityParam(
-    `/restaurants/${restaurant.id}${collectionId ? `?collectionId=${collectionId}` : ''}`,
+    `/restaurants/${getUrlKey(restaurant)}${collectionId ? `?collectionId=${collectionId}` : ''}`,
     cityId
   );
 

@@ -1,22 +1,35 @@
 import { supabase } from "@/lib/supabase";
 import { RestaurantClient } from "./restaurant-client";
+import { getUrlKey, isUuid } from "@/lib/url-keys";
 import type { Metadata } from "next";
 
 export const revalidate = 60;
 
 // Helper to fetch restaurant
-async function getRestaurant(id: string) {
-  const { data } = await supabase
+async function getRestaurant(key: string) {
+  const byKeyResult = await supabase
     .from('restaurants')
     .select('*')
-    .eq('id', id)
-    .single();
-  return data;
+    .eq('url_key', key)
+    .maybeSingle();
+
+  if (byKeyResult.data) return byKeyResult.data;
+
+  if (isUuid(key)) {
+    const byIdResult = await supabase
+      .from('restaurants')
+      .select('*')
+      .eq('id', key)
+      .maybeSingle();
+    return byIdResult.data;
+  }
+
+  return null;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
-  const restaurant = await getRestaurant(id);
+  const { id: key } = await params;
+  const restaurant = await getRestaurant(key);
 
   if (!restaurant) {
     return {
@@ -47,8 +60,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function RestaurantPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const restaurant = await getRestaurant(id);
+  const { id: key } = await params;
+  const restaurant = await getRestaurant(key);
 
   const jsonLd = restaurant ? {
     '@context': 'https://schema.org',
@@ -66,7 +79,7 @@ export default async function RestaurantPage({ params }: { params: Promise<{ id:
       latitude: restaurant.location.coordinates[1],
       longitude: restaurant.location.coordinates[0]
     } : undefined,
-    url: `${process.env.NEXT_PUBLIC_BASE_URL}/restaurants/${restaurant.id}`,
+    url: `${process.env.NEXT_PUBLIC_BASE_URL}/restaurants/${getUrlKey(restaurant)}`,
     telephone: restaurant.phone_number,
     priceRange: restaurant.price_level ? '$'.repeat(restaurant.price_level) : '$',
     servesCuisine: restaurant.cuisine_type || 'Vietnamese',

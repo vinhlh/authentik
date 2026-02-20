@@ -30,6 +30,7 @@ export interface ExtractionOptions {
 export interface ExtractionResult {
   collection: {
     id: string
+    url_key?: string | null
     name: string
     name_vi?: string
     name_en?: string | null
@@ -140,6 +141,7 @@ export async function extractFromVideo(
   // In dry mode, create a mock collection
   let collection: {
     id: string;
+    url_key?: string | null;
     name: string;
     name_vi?: string;
     name_en?: string | null;
@@ -155,6 +157,7 @@ export async function extractFromVideo(
   if (dry) {
     collection = {
       id: 'dry-run-preview',
+      url_key: createSlug(collectionName) || 'dry-run-preview',
       name: collectionName,
       name_vi: collectionName,
       source_channel_id: sourceChannelId,
@@ -387,6 +390,7 @@ export async function extractFromVideo(
   return {
     collection: {
       id: collection.id,
+      url_key: collection.url_key || null,
       name: collection.name_vi || collection.name,
       creator_name: creatorName,
       source_url: url,

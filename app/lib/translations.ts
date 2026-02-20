@@ -59,8 +59,6 @@ export const TRANSLATIONS = {
     "common.viewAll": "View all",
     "common.loading": "Loading...",
     "collections.empty.title": "No collections yet",
-    "collections.empty.desc": "Extract your first collection by running the extraction command in your terminal.",
-    "collections.empty.cmd": "npm run extract -- \\\"VIDEO_URL\\\"",
     "restaurant.notFound": "Restaurant not found",
     "restaurant.backHome": "Back to Home",
     "restaurant.authenticitySignal": "Authenticity Signal",

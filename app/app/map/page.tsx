@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { MapPin, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
+import { getUrlKey } from '@/lib/url-keys'
 
 // Mock restaurant data
 const MOCK_RESTAURANTS = [
@@ -107,7 +108,7 @@ export default function MapPage() {
               </div>
 
               <div className="flex gap-3">
-                <Link href={`/restaurants/${selectedRestaurant.id}`} className="flex-1">
+                <Link href={`/restaurants/${getUrlKey(selectedRestaurant)}`} className="flex-1">
                   <Button className="w-full">View Details</Button>
                 </Link>
                 <Button variant="outline" className="flex-1">

@@ -2,36 +2,55 @@ import { supabase } from "@/lib/supabase";
 import { CollectionContent } from "@/components/stitch/collection-content";
 import { Restaurant } from "@/components/stitch/restaurant-card";
 import { parseWkbPoint } from "@/lib/utils/wkb-parser";
+import { isUuid } from "@/lib/url-keys";
 import Link from "next/link";
 
 import type { Metadata } from "next";
 
 export const revalidate = 60;
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
+async function getCollectionByKey(
+  key: string,
+  columns: string
+): Promise<any | null> {
+  const byKeyResult = await supabase
+    .from("collections")
+    .select(columns)
+    .eq("url_key", key)
+    .maybeSingle();
 
-  // Fetch collection
-  const { data: collection, error } = await supabase
-    .from('collections')
-    .select('name_vi, name_en, description_vi, description_en, source_url, source_channel_url, source_channel_name')
-    .eq('id', id)
-    .single();
+  if (byKeyResult.data) return byKeyResult.data;
 
-  if (error) {
-    console.error(`[generateMetadata] Supabase error for id=${id}:`, error.message);
+  if (isUuid(key)) {
+    const byIdResult = await supabase
+      .from("collections")
+      .select(columns)
+      .eq("id", key)
+      .maybeSingle();
+    return byIdResult.data || null;
   }
+
+  return null;
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id: key } = await params;
+
+  const collection = await getCollectionByKey(
+    key,
+    "name_vi, name_en, description_vi, description_en, source_url, source_channel_url, source_channel_name"
+  );
 
   // Removed early return to allow fallbacks
   // if (!collection && id !== "1") { return { title: "Collection Not Found" } }
 
 
   // Use mock data if mocked
-  const name = collection?.name_en || collection?.name_vi || (id === "1" ? "Best Bánh Mì in Da Nang" : "Authentik Collection");
-  const description = collection?.description_en || collection?.description_vi || (id === "1" ? "A curated tour of the crispiest, most flavorful Bánh Mì spots in the city." : "Discover authentic food in Da Nang.");
+  const name = collection?.name_en || collection?.name_vi || (key === "1" ? "Best Bánh Mì in Da Nang" : "Authentik Collection");
+  const description = collection?.description_en || collection?.description_vi || (key === "1" ? "A curated tour of the crispiest, most flavorful Bánh Mì spots in the city." : "Discover authentic food in Da Nang.");
 
   // Extract video ID for cover image
-  const videoId = collection?.source_url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1] || (id === "1" ? "dQw4w9WgXcQ" : null);
+  const videoId = collection?.source_url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1] || (key === "1" ? "dQw4w9WgXcQ" : null);
   const ogImage = videoId
     ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
     : "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1000";
@@ -55,7 +74,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function CollectionPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  const { id: key } = await params;
   let collection: any = null;
   let restaurants: Restaurant[] = [];
 
@@ -98,16 +117,11 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
 
   try {
     // If using mock ID "1" or explicit failover needed, use mock data
-    if (id === '1' || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === 'placeholder_until_provided') {
+    if (key === '1' || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === 'placeholder_until_provided') {
       throw new Error("Using mock data");
     }
 
-    // Fetch Collection
-    const { data: collectionData, error: colError } = await supabase
-      .from('collections')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const collectionData = await getCollectionByKey(key, "*");
 
     if (collectionData) {
       collection = collectionData;
@@ -122,7 +136,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
           ai_summary_vi,
           restaurant:restaurants(*)
         `)
-        .eq('collection_id', id);
+        .eq('collection_id', collection.id);
 
       if (relError) console.error(`[DEBUG] relError:`, relError);
 
@@ -141,6 +155,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
 
             return {
               id: r.id,
+              url_key: r.url_key,
               name: r.name,
               rating: r.google_rating || (r.authenticity_score ? Number((3 + r.authenticity_score * 2).toFixed(1)) : 4.5),
               // User requested specialties instead of location for Collection view
@@ -161,7 +176,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
   } catch (e) {
     console.log("Falling back to mock data for Collection Page");
     // Fallback logic
-    if (id === '1' || !collection) {
+    if (key === '1' || !collection) {
       collection = MOCK_COLLECTION;
       restaurants = MOCK_COLLECTION.restaurants as any;
     }

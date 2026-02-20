@@ -8,10 +8,10 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import util from 'util'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { detectMarketCityFromText, type MarketCity } from '../market-cities'
 
-const execAsync = util.promisify(exec)
+const execFileAsync = util.promisify(execFile)
 
 
 // YouTube transcript API would be used here
@@ -140,25 +140,25 @@ async function findFirstExistingFile(paths: string[]): Promise<string | null> {
 }
 
 async function convertAudioToM4a(inputPath: string, outputPath: string): Promise<string> {
-  const ffmpegModule = await import('fluent-ffmpeg')
-  const ffmpeg = (ffmpegModule as any).default ?? ffmpegModule
-
   const ffmpegStaticModule = await import('ffmpeg-static')
   const ffmpegPath = (ffmpegStaticModule as any).default ?? ffmpegStaticModule
-  if (typeof ffmpegPath === 'string') {
-    ffmpeg.setFfmpegPath(ffmpegPath)
-  }
+  const ffmpegBinary = typeof ffmpegPath === 'string' ? ffmpegPath : 'ffmpeg'
 
-  await new Promise<void>((resolve, reject) => {
-    ffmpeg(inputPath)
-      .noVideo()
-      .audioCodec('aac')
-      .outputOptions(['-movflags', 'faststart'])
-      .format('ipod') // m4a container
-      .save(outputPath)
-      .on('end', () => resolve())
-      .on('error', (err: any) => reject(err))
-  })
+  await execFileAsync(ffmpegBinary, [
+    '-y',
+    '-i',
+    inputPath,
+    '-vn',
+    '-c:a',
+    'aac',
+    '-movflags',
+    'faststart',
+    outputPath,
+  ])
+
+  if (!fs.existsSync(outputPath)) {
+    throw new Error(`ffmpeg conversion did not produce output file: ${outputPath}`)
+  }
 
   return outputPath
 }

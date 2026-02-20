@@ -5,11 +5,13 @@ import { ArrowRight, Utensils } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
+import { getUrlKey } from "@/lib/url-keys";
 
 interface CollectionCardProps {
   collection: {
     id: string;
-    name?: string;
+    url_key?: string | null;
+    name?: string | null;
     name_vi?: string | null;
     name_en?: string | null;
     restaurant_count?: number;
@@ -39,7 +41,7 @@ export function CollectionCard({ collection }: CollectionCardProps) {
     : undefined;
 
   return (
-    <Link href={withCityParam(`/collections/${collection.id}`, cityId)} className="group block h-full">
+    <Link href={withCityParam(`/collections/${getUrlKey(collection)}`, cityId)} className="group block h-full">
       <div className="relative h-full bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 border border-transparent hover:border-gray-100 flex flex-col">
         {/* Image with responsive srcSet - 16:9 Ratio for YouTube style */}
         <div className="aspect-video relative overflow-hidden bg-gray-100">
