@@ -2,6 +2,8 @@ export type MarketRegion = 'vietnam' | 'singapore'
 
 export type MarketCityId =
   | 'da-nang'
+  | 'da-lat'
+  | 'nha-trang'
   | 'ha-noi'
   | 'ho-chi-minh'
   | 'hue'
@@ -28,6 +30,26 @@ export const MARKET_CITIES: MarketCity[] = [
     latitude: 16.0544,
     longitude: 108.2022,
     aliases: ['da nang', 'đà nẵng', 'danang'],
+  },
+  {
+    id: 'da-lat',
+    name: 'Da Lat',
+    country: 'Vietnam',
+    shortLabel: 'DL',
+    region: 'vietnam',
+    latitude: 11.9404,
+    longitude: 108.4583,
+    aliases: ['da lat', 'đà lạt', 'dalat'],
+  },
+  {
+    id: 'nha-trang',
+    name: 'Nha Trang',
+    country: 'Vietnam',
+    shortLabel: 'NT',
+    region: 'vietnam',
+    latitude: 12.2388,
+    longitude: 109.1967,
+    aliases: ['nha trang', 'nhatrang'],
   },
   {
     id: 'ha-noi',
@@ -87,6 +109,8 @@ export const DEFAULT_MARKET_CITY: MarketCity = CITY_BY_ID.get('da-nang')!
 
 const COLLECTION_CITY_TAGS_BY_ID: Record<MarketCityId, string[]> = {
   'da-nang': ['Đà Nẵng', 'Da Nang'],
+  'da-lat': ['Đà Lạt', 'Da Lat', 'Dalat'],
+  'nha-trang': ['Nha Trang'],
   'ha-noi': ['Hà Nội', 'Ha Noi'],
   'ho-chi-minh': ['Hồ Chí Minh', 'Ho Chi Minh City', 'Saigon'],
   hue: ['Huế', 'Hue'],

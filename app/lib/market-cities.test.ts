@@ -7,6 +7,16 @@ import {
 } from './market-cities'
 
 describe('detectMarketCityFromText', () => {
+  it('detects Nha Trang from text', () => {
+    const city = detectMarketCityFromText('Ăn gì ở Nha Trang cuối tuần?')
+    expect(city.id).toBe('nha-trang')
+  })
+
+  it('detects Da Lat from accented Vietnamese text', () => {
+    const city = detectMarketCityFromText('Ăn gì ở Đà Lạt cuối tuần?')
+    expect(city.id).toBe('da-lat')
+  })
+
   it('detects Ha Noi from accented Vietnamese text', () => {
     const city = detectMarketCityFromText('Ăn gì ở Hà Nội cuối tuần?')
     expect(city.id).toBe('ha-noi')
@@ -24,6 +34,16 @@ describe('detectMarketCityFromText', () => {
 })
 
 describe('getMarketCityById', () => {
+  it('returns Nha Trang for known id', () => {
+    const city = getMarketCityById('nha-trang')
+    expect(city.id).toBe('nha-trang')
+  })
+
+  it('returns Da Lat for known id', () => {
+    const city = getMarketCityById('da-lat')
+    expect(city.id).toBe('da-lat')
+  })
+
   it('returns default city for unknown id', () => {
     const city = getMarketCityById('unknown-id')
     expect(city.id).toBe(DEFAULT_MARKET_CITY.id)

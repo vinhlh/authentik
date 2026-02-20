@@ -13,6 +13,8 @@ if (!MAPBOX_TOKEN) {
  */
 export const CITY_CENTERS = {
   daNang: { longitude: 108.2022, latitude: 16.0544, zoom: 13 },
+  daLat: { longitude: 108.4583, latitude: 11.9404, zoom: 13 },
+  nhaTrang: { longitude: 109.1967, latitude: 12.2388, zoom: 13 },
   haNoi: { longitude: 105.8342, latitude: 21.0278, zoom: 13 },
   hoChiMinh: { longitude: 106.6297, latitude: 10.8231, zoom: 13 },
   hue: { longitude: 107.5909, latitude: 16.4637, zoom: 13 },

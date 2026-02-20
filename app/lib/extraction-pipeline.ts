@@ -23,6 +23,11 @@ import { processRestaurantPhotos, createSlug } from './photo-pipeline'
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+function getNonEmptyText(value: string | null | undefined): string | null {
+  const normalized = value?.trim()
+  return normalized ? normalized : null
+}
+
 export interface ExtractionOptions {
   dry?: boolean  // Preview mode - don't import to database
 }
@@ -132,10 +137,17 @@ export async function extractFromVideo(
   )
 
   // Use AI data or fallbacks
-  const collectionName = unifiedData?.collection.name_vi || metadata?.title || `Collection from ${creatorName}`
-  const collectionDescription = unifiedData?.collection.description_vi || metadata?.description || null
-  const nameEn = unifiedData?.collection.name_en || null
-  const descriptionEn = unifiedData?.collection.description_en || null
+  const collectionName =
+    getNonEmptyText(unifiedData?.collection.name_vi) ||
+    getNonEmptyText(metadata?.title) ||
+    `Collection from ${creatorName}`
+  const collectionDescription =
+    getNonEmptyText(unifiedData?.collection.description_vi) ||
+    getNonEmptyText(metadata?.description)
+  const aiNameEn = getNonEmptyText(unifiedData?.collection.name_en)
+  const aiDescriptionEn = getNonEmptyText(unifiedData?.collection.description_en)
+  const nameEnForInsert = aiNameEn || collectionName
+  const descriptionEnForInsert = aiDescriptionEn || collectionDescription
 
   // In dry mode, create a mock collection
   let collection: {
@@ -157,13 +169,16 @@ export async function extractFromVideo(
       id: 'dry-run-preview',
       name: collectionName,
       name_vi: collectionName,
+      name_en: nameEnForInsert,
+      description_vi: collectionDescription || null,
+      description_en: descriptionEnForInsert || null,
       source_channel_id: sourceChannelId,
       source_channel_url: sourceChannelUrl,
       source_channel_name: sourceChannelName,
     }
     console.log(`📝 Would create collection: ${collection.name}`)
-    if (nameEn) console.log(`   (EN): ${nameEn}`)
-    if (descriptionEn) console.log(`   (EN Desc): ${descriptionEn?.substring(0, 50)}...`)
+    if (nameEnForInsert) console.log(`   (EN): ${nameEnForInsert}`)
+    if (descriptionEnForInsert) console.log(`   (EN Desc): ${descriptionEnForInsert.substring(0, 50)}...`)
   } else {
     // Check if collection already exists by source_url OR video ID search
     // We normalize by searching for the video ID to handle different URL formats
@@ -196,11 +211,21 @@ export async function extractFromVideo(
 
     if (existingCollection) {
       console.log(`🔄 Found existing collection: ${existingCollection.name_vi || existingCollection.name}`)
+      const nameEnForUpdate =
+        aiNameEn ||
+        getNonEmptyText(existingCollection.name_en) ||
+        getNonEmptyText(existingCollection.name_vi) ||
+        collectionName
+      const descriptionEnForUpdate =
+        aiDescriptionEn ||
+        getNonEmptyText(existingCollection.description_en) ||
+        getNonEmptyText(existingCollection.description_vi) ||
+        collectionDescription
       const updatePayload: Record<string, unknown> = {
         name_vi: collectionName, // Update name if video title changed
-        description_vi: collectionDescription,
-        name_en: nameEn,
-        description_en: descriptionEn,
+        description_vi: collectionDescription || null,
+        name_en: nameEnForUpdate,
+        description_en: descriptionEnForUpdate || null,
         creator_name: creatorName,
         source_channel_name: sourceChannelName,
         // Keep non-city tags but enforce a single canonical city tag set.
@@ -228,9 +253,9 @@ export async function extractFromVideo(
         .from('collections')
         .insert({
           name_vi: collectionName,
-          description_vi: collectionDescription,
-          name_en: nameEn,
-          description_en: descriptionEn,
+          description_vi: collectionDescription || null,
+          name_en: nameEnForInsert,
+          description_en: descriptionEnForInsert || null,
           creator_name: creatorName,
           source_url: url,
           source_channel_id: sourceChannelId,

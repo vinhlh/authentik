@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     template: "%s | Authentik"
   },
   description: "Discover where locals actually eat across Vietnam and Singapore. Curated restaurant collections filtering out fake reviews and tourist traps.",
-  keywords: ["Vietnam", "Singapore", "food", "restaurants", "authentic", "local", "travel", "cuisine", "Ha Noi", "Ho Chi Minh City", "Hue", "Da Nang"],
+  keywords: ["Vietnam", "Singapore", "food", "restaurants", "authentic", "local", "travel", "cuisine", "Ha Noi", "Ho Chi Minh City", "Hue", "Da Nang", "Da Lat", "Nha Trang"],
   authors: [{ name: "Authentik Team" }],
   creator: "Authentik",
   openGraph: {

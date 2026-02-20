@@ -3,10 +3,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Language, TRANSLATIONS, TranslationKey } from './translations';
 
-interface I18nObject {
-  [key: string]: string | undefined | any; // allow any for flexibility but prefer stronger types if possible
-}
-
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -15,6 +11,31 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+function getNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function resolveI18nText(
+  obj: Record<string, unknown> | null | undefined,
+  field: string,
+  language: Language
+): string {
+  if (!obj) return '';
+
+  const fieldCandidates = language === 'en'
+    ? [`${field}_en`, `${field}_vi`, field]
+    : [`${field}_vi`, field, `${field}_en`];
+
+  for (const candidate of fieldCandidates) {
+    const value = getNonEmptyString(obj[candidate]);
+    if (value) return value;
+  }
+
+  return '';
+}
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>('en');
@@ -40,26 +61,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return TRANSLATIONS[language][key] || key;
   };
 
-  /*
-   * Helper to get dynamic content based on language
-   * Strict mode: No fallback to other languages to avoid mixing content
-   */
+  // Helper to get dynamic content with non-empty fallback chain.
   const getI18nText = (obj: any, field: string): string => {
-    if (!obj) return '';
-
-    // If language is English, strictly look for field_en
-    if (language === 'en') {
-      const enField = `${field}_en`;
-      return obj[enField] || '';
-    }
-
-    // If language is Vietnamese, strictly look for field_vi (or legacy field if mapped)
-    if (language === 'vi') {
-      const viField = `${field}_vi`;
-      return obj[viField] || obj[field] || '';
-    }
-
-    return obj[field] || '';
+    return resolveI18nText(obj, field, language);
   }
 
   return (
