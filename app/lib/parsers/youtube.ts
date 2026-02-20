@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod'
-import { detectMarketCityFromText, type MarketCity } from '../market-cities'
+import { detectMarketCityFromTextOrNull, type MarketCity } from '../market-cities'
 
 
 // YouTube transcript API would be used here
@@ -460,7 +460,11 @@ export async function getVideoTranscript(videoId: string): Promise<string | null
 export async function extractRestaurantsFromTranscript(
   transcript: string,
   videoMetadata: YouTubeVideoMetadata,
-  cityContext: MarketCity = detectMarketCityFromText(videoMetadata.title, videoMetadata.description, videoMetadata.channelName)
+  cityContext: MarketCity | null = detectMarketCityFromTextOrNull(
+    videoMetadata.title,
+    videoMetadata.description,
+    videoMetadata.channelName
+  )
 ): Promise<RestaurantMention[]> {
   const apiKey = process.env.GEMINI_API_KEY
 
@@ -481,12 +485,20 @@ export async function extractRestaurantsFromTranscript(
       generationConfig: GEMINI_CONFIG.generationConfig
     });
 
+    const targetCityLabel = cityContext
+      ? `${cityContext.name}, ${cityContext.country}`
+      : 'Unknown'
+    const addressFallback = cityContext?.name || 'location from context'
+    const localityRule = cityContext
+      ? 'AUTHENTIC LOCAL ONLY: Extract authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.'
+      : 'AUTHENTIC LOCAL ONLY: Keep cuisine aligned with explicitly mentioned places. Do not force a specific city if the transcript does not provide one.'
+
     const prompt = `
     You are an expert food critic and data extractor.
     Analyze the following YouTube video transcript and metadata to extract restaurant information.
 
     Market focus: Vietnam and Singapore.
-    Target city: ${cityContext.name}, ${cityContext.country}.
+    Target city: ${targetCityLabel}.
 
     CRITICAL RULES:
     1. STRICT FACTUAL EXTRACTION: ONLY extract information EXPLICITLY mentioned in the transcript or title/description.
@@ -495,11 +507,11 @@ export async function extractRestaurantsFromTranscript(
     4. FILTER NON-REVIEWS: DO NOT extract a restaurant if the reviewer visited it but could not eat there (e.g., it was closed, sold out, too crowded) and therefore provided no opinion on the food.
     5. ABSENT DATA: If specific praise/criticism is missing but they DID eat there, leave the 'notes' field empty or use a brief factual statement.
     6. PRECISION: Be extremely precise with restaurant names.
-    7. AUTHENTIC LOCAL ONLY: Extract authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
+    7. ${localityRule}
 
     Extract a JSON array of restaurants mentioned. Each object should have:
     - name: The name of the restaurant or food stall. Be precise.
-    - address: The address if mentioned (or "${cityContext.name}" if inferred but not specific).
+    - address: The address if mentioned (or "${addressFallback}" if inferred but not specific).
     - dishes: Array of dishes explicitly recommended or eaten there.
     - priceRange: Estimation based ONLY on context ("$" = cheap street food, "$$" = casual, "$$$" = upscale).
     - notes: Detailed summary of the reviewer's actual experience found in the text. Include atmosphere, specific praise/criticism of food, and why they recommend it.
@@ -562,7 +574,11 @@ export async function extractRestaurantsFromTranscript(
  */
 export function extractRestaurantsFromDescriptionRegex(
   metadata: YouTubeVideoMetadata,
-  cityContext: MarketCity = detectMarketCityFromText(metadata.title, metadata.description, metadata.channelName)
+  cityContext: MarketCity | null = detectMarketCityFromTextOrNull(
+    metadata.title,
+    metadata.description,
+    metadata.channelName
+  )
 ): RestaurantMention[] {
   if (!metadata.description || metadata.description.length < 30) {
     return []
@@ -616,7 +632,7 @@ export function extractRestaurantsFromDescriptionRegex(
 
     restaurants.push({
       name,
-      address: cityContext.name,
+      address: cityContext?.name,
       dishes,
       priceRange: '$',
       notes: `Featured at ${match[1]}:${match[2]}${match[3] ? ':' + match[3] : ''} in the video`,
@@ -633,7 +649,11 @@ export function extractRestaurantsFromDescriptionRegex(
  */
 export async function extractRestaurantsFromDescription(
   metadata: YouTubeVideoMetadata,
-  cityContext: MarketCity = detectMarketCityFromText(metadata.title, metadata.description, metadata.channelName)
+  cityContext: MarketCity | null = detectMarketCityFromTextOrNull(
+    metadata.title,
+    metadata.description,
+    metadata.channelName
+  )
 ): Promise<RestaurantMention[]> {
   // Check if description has meaningful content
   if (!metadata.description || metadata.description.length < 50) {
@@ -666,6 +686,14 @@ export async function extractRestaurantsFromDescription(
       generationConfig: { responseMimeType: "application/json" }
     })
 
+    const targetCityLabel = cityContext
+      ? `${cityContext.name}, ${cityContext.country}`
+      : 'Unknown'
+    const addressFallback = cityContext?.name || 'location from context'
+    const localityRule = cityContext
+      ? 'AUTHENTIC LOCAL ONLY: Extract authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.'
+      : 'AUTHENTIC LOCAL ONLY: Keep cuisine aligned with explicitly mentioned places. Do not force a specific city if the source text is ambiguous.'
+
     const prompt = `
     You are an expert at extracting restaurant information from YouTube video descriptions.
 
@@ -674,7 +702,7 @@ export async function extractRestaurantsFromDescription(
     2. NO META-TALK: DO NOT use phrases like "safest bet", "likely", or "assuming".
     3. EXCLUDE CLOSED PLACES: If the description mentions a place was closed or they couldn't eat there, do not include it.
     4. FACTUAL ONLY: If the description doesn't explicitly describe the taste or experience, leave the 'notes' field empty or factual.
-    5. AUTHENTIC LOCAL ONLY: Extract authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
+    5. ${localityRule}
 
     Analyze the following YouTube video title and description to extract ALL restaurants/food places mentioned.
     This is a food review video in Vietnam or Singapore, so names may be in Vietnamese or English.
@@ -686,7 +714,7 @@ export async function extractRestaurantsFromDescription(
 
     Extract a JSON array where each object has:
     - name: The exact name of the restaurant/food stall (e.g., "Mỳ Quảng Nhung", "Bún cá 109")
-    - address: "${cityContext.name}" (target city fallback if exact address is not mentioned)
+    - address: "${addressFallback}" (fallback if exact address is not mentioned)
     - dishes: Infer the main dish from the name if possible (e.g., "Mỳ Quảng" for "Mỳ Quảng Nhung").
     - priceRange: "$" for street food (default assumption for these types of videos)
     - notes: Brief factual note about what type of food they serve.
@@ -695,7 +723,7 @@ export async function extractRestaurantsFromDescription(
     Return ONLY the JSON array. If no restaurants are identified, return [].
 
     Video Title: ${metadata.title}
-    Target city: ${cityContext.name}, ${cityContext.country}
+    Target city: ${targetCityLabel}
     Video Description:
     ${metadata.description}
     `
@@ -752,19 +780,23 @@ export async function parseYouTubeVideo(url: string): Promise<{
   }
 
   // Get video metadata
-  let metadata = await getVideoMetadata(videoId)
+  const metadata = await getVideoMetadata(videoId)
 
   if (!metadata) {
     throw new Error('❌ Could not fetch video metadata. Check YOUTUBE_API_KEY.')
   }
 
-  const inferredCity = detectMarketCityFromText(
+  const inferredCity = detectMarketCityFromTextOrNull(
     metadata.title,
     metadata.description,
     metadata.channelName,
     url
   )
-  console.log(`📍 Inferred city context: ${inferredCity.name}, ${inferredCity.country}`)
+  if (inferredCity) {
+    console.log(`📍 Inferred city context: ${inferredCity.name}, ${inferredCity.country}`)
+  } else {
+    console.log('📍 Inferred city context: unknown')
+  }
 
   // Get transcript
   console.log(`fetching transcript for video: ${videoId}`)

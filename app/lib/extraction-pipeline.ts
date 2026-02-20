@@ -13,7 +13,7 @@ import {
   type PlaceDetails,
 } from './api/google-places'
 import {
-  detectMarketCityFromText,
+  detectMarketCityFromTextOrNull,
   getCityLocationBias,
   replaceCollectionCityTags,
   type MarketCity,
@@ -104,13 +104,17 @@ export async function extractFromVideo(
   }
 
   console.log(`✅ Found ${restaurants.length} restaurant mentions`)
-  const targetCity = detectMarketCityFromText(
+  const detectedCity = detectMarketCityFromTextOrNull(
     metadata?.title,
     metadata?.description,
     ...restaurants.slice(0, 5).map(r => r.address),
     url
   )
-  console.log(`🌏 Market focus: ${targetCity.name}, ${targetCity.country}`)
+  if (detectedCity) {
+    console.log(`🌏 Market focus: ${detectedCity.name}, ${detectedCity.country}`)
+  } else {
+    console.log(`🌏 Market focus: unknown (running without city tag bias)`)
+  }
 
   const sourceChannelId =
     platform === 'youtube'
@@ -129,11 +133,11 @@ export async function extractFromVideo(
 
   // --- OPTIMIZED: Unified AI Extraction ---
   console.log(`🧠 AI Processing: Generating unified collection details and reviews...`)
-  let unifiedData = await generateUnifiedExtraction(
+  const unifiedData = await generateUnifiedExtraction(
     metadata || { title: '', description: '' },
     restaurants,
     creatorName,
-    targetCity
+    detectedCity
   )
 
   // Use AI data or fallbacks
@@ -228,8 +232,10 @@ export async function extractFromVideo(
         description_en: descriptionEnForUpdate || null,
         creator_name: creatorName,
         source_channel_name: sourceChannelName,
-        // Keep non-city tags but enforce a single canonical city tag set.
-        tags: replaceCollectionCityTags(existingCollection.tags, targetCity),
+        // Only enforce city tags when a city was explicitly detected.
+        tags: detectedCity
+          ? replaceCollectionCityTags(existingCollection.tags, detectedCity)
+          : existingCollection.tags,
       }
       if (sourceChannelId) updatePayload.source_channel_id = sourceChannelId
       if (sourceChannelUrl) updatePayload.source_channel_url = sourceChannelUrl
@@ -261,7 +267,7 @@ export async function extractFromVideo(
           source_channel_id: sourceChannelId,
           source_channel_url: sourceChannelUrl,
           source_channel_name: sourceChannelName,
-          tags: replaceCollectionCityTags(null, targetCity),
+          tags: detectedCity ? replaceCollectionCityTags(null, detectedCity) : [],
         })
         .select()
         .single()
@@ -289,9 +295,14 @@ export async function extractFromVideo(
       console.log(`🔍 Verifying: ${mention.name}`)
 
       // Verify with Google Places
+      const verifyOptions = detectedCity
+        ? {
+            locationBias: getCityLocationBias(detectedCity),
+            cityName: detectedCity.name,
+          }
+        : {}
       const verified = await verifyRestaurant(mention.name, mention.address, {
-        locationBias: getCityLocationBias(targetCity),
-        cityName: targetCity.name,
+        ...verifyOptions,
       })
 
       if (!verified) {
@@ -713,7 +724,7 @@ async function generateUnifiedExtraction(
   metadata: { title?: string; description?: string },
   restaurants: RestaurantMention[],
   creatorName: string,
-  targetCity: MarketCity
+  targetCity: MarketCity | null
 ): Promise<{
   collection: {
     name_vi: string;
@@ -742,6 +753,12 @@ async function generateUnifiedExtraction(
     const listings = restaurants.map(r =>
       `- Name: ${r.name}\n  Notes: "${(r.notes || '').substring(0, 300)}"`
     ).join('\n');
+    const targetCityLabel = targetCity
+      ? `${targetCity.name}, ${targetCity.country}`
+      : 'Unknown'
+    const localityRule = targetCity
+      ? 'AUTHENTIC LOCAL ONLY: Keep authentic local cuisine for the target city. For Vietnam cities, keep Vietnamese dishes. For Singapore, keep local hawker/Singaporean dishes. Exclude unrelated imported cuisines.'
+      : 'AUTHENTIC LOCAL ONLY: Keep cuisine aligned with locations explicitly mentioned in the source data. Do not force any specific city when location is unclear.'
 
     const prompt = `
     You are an AI editor for a food discovery app. Process this video data and output a JSON object.
@@ -749,7 +766,7 @@ async function generateUnifiedExtraction(
     Input Data:
     - Creator: "${creatorName}"
     - Market focus: Vietnam and Singapore
-    - Target city: "${targetCity.name}, ${targetCity.country}"
+    - Target city: "${targetCityLabel}"
     - Video Title: "${metadata.title || ''}"
     - Description: "${(metadata.description || '').substring(0, 1000)}"
     - Restaurants:
@@ -779,7 +796,7 @@ ${listings}
     - VI summary must be in VIETNAMESE.
     - BANNED WORDS: Do NOT use "hấp dẫn", "ngon", "tuyệt vời", "đậm đà" universally. Use specific sensory words (e.g. "giòn rụm", "thanh ngọt", "béo ngậy", "thơm nức").
     - VARIETY: Ensure each review uses DIFFERENT adjectives.
-    - AUTHENTIC LOCAL ONLY: Keep authentic local cuisine for the target city. For Vietnam cities, keep Vietnamese dishes. For Singapore, keep local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
+    - ${localityRule}
 
     Output JSON Schema:
     {

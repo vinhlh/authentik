@@ -1,13 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { Language, TRANSLATIONS, TranslationKey } from './translations';
 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey) => string;
-  getI18nText: (obj: any, field: string) => string;
+  getI18nText: (obj: Record<string, unknown> | null | undefined, field: string) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -38,17 +38,11 @@ export function resolveI18nText(
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>('en');
-
-  // Persist preference
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('authentik_lang') as Language;
-      if (saved && (saved === 'vi' || saved === 'en')) {
-        setLanguageState(saved);
-      }
-    }
-  }, []);
+  const [language, setLanguageState] = useState<Language>(() => {
+    if (typeof window === 'undefined') return 'en';
+    const saved = localStorage.getItem('authentik_lang');
+    return saved === 'vi' || saved === 'en' ? saved : 'en';
+  });
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
@@ -62,7 +56,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Helper to get dynamic content with non-empty fallback chain.
-  const getI18nText = (obj: any, field: string): string => {
+  const getI18nText = (
+    obj: Record<string, unknown> | null | undefined,
+    field: string
+  ): string => {
     return resolveI18nText(obj, field, language);
   }
 

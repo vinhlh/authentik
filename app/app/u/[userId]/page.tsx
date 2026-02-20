@@ -1,11 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
 import { CollectionSection } from "@/components/stitch/collection-section";
 import { CollectionHeader } from "@/components/stitch/collection-header";
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Metadata } from 'next';
 import { parseWkbPoint } from "@/lib/utils/wkb-parser";
 import { supabase } from "@/lib/supabase";
+import { inferRestaurantCity } from "@/lib/restaurant-city";
 
 interface Props {
   params: Promise<{
@@ -27,10 +26,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `${name}'s Collection | Authentik`,
-    description: `Check out ${name}'s favorite authentic food spots in Da Nang.`,
+    description: `Check out ${name}'s favorite authentic food spots.`,
     openGraph: {
       title: `${name}'s Collection | Authentik`,
-      description: `Check out ${name}'s favorite authentic food spots in Da Nang.`,
+      description: `Check out ${name}'s favorite authentic food spots.`,
     }
   };
 }
@@ -86,7 +85,8 @@ export default async function PublicCollectionPage({ params }: Props) {
       id: r.id,
       name: r.name,
       rating: r.google_rating || r.authenticity_score * 5 || 4.5,
-      location: r.address?.split(',')[0] || 'Da Nang',
+      location: r.address?.split(',')[0] || 'Unknown location',
+      city: inferRestaurantCity(r.address),
       cuisine: tags[0],
       price: priceSymbol,
       tags: tags,
@@ -99,9 +99,16 @@ export default async function PublicCollectionPage({ params }: Props) {
     };
   });
 
+  const cityNames = Array.from(new Set(restaurants.map((restaurant) => restaurant.city).filter(Boolean)));
+  const locationSummary = cityNames.length === 1
+    ? cityNames[0]
+    : cityNames.length > 1
+      ? `${cityNames.length} cities`
+      : "multiple cities";
+
   // Construct collection object for Header
-  const title = `Da Nang Collection`;
-  const desc = `Restaurants in Da Nang favorited by ${displayName}`;
+  const title = cityNames.length === 1 ? `${cityNames[0]} Collection` : "Multi-city Collection";
+  const desc = `Restaurants across ${locationSummary} favorited by ${displayName}`;
 
   const collectionProp = {
     name: title,
@@ -123,6 +130,7 @@ export default async function PublicCollectionPage({ params }: Props) {
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         <CollectionSection
           restaurants={restaurants}
+          groupByCity
           emptyMessage="No favorites yet. Start exploring to add some!"
         />
       </main>

@@ -12,6 +12,7 @@ import { Restaurant } from "@/components/stitch/restaurant-card";
 import { parseWkbPoint } from "@/lib/utils/wkb-parser";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
+import { inferRestaurantCity } from "@/lib/restaurant-city";
 
 export function FavoritesClient() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -67,7 +68,8 @@ export function FavoritesClient() {
           id: r.id,
           name: r.name,
           rating: r.google_rating || r.authenticity_score * 5 || 4.5,
-          location: r.address?.split(',')[0] || 'Da Nang', // Simple short address
+          location: r.address?.split(',')[0] || 'Unknown location',
+          city: inferRestaurantCity(r.address),
           cuisine: tags[0],
           price: priceSymbol,
           tags: tags,
@@ -123,6 +125,14 @@ export function FavoritesClient() {
     );
   }
 
+  const cityNames = Array.from(new Set(restaurants.map((restaurant) => restaurant.city).filter(Boolean)));
+  const placesLabel = `${restaurants.length} ${restaurants.length === 1 ? 'place' : 'places'} you love`;
+  const cityLabel = cityNames.length === 1
+    ? `in ${cityNames[0]}`
+    : cityNames.length > 1
+      ? `across ${cityNames.length} cities`
+      : "";
+
   return (
     <div className="min-h-screen pt-24 pb-12 px-6">
       <div className="max-w-[1200px] mx-auto">
@@ -137,7 +147,7 @@ export function FavoritesClient() {
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-[#1c1917]">My Collection</h1>
             <p className="text-gray-600 mt-2">
-              {restaurants.length} {restaurants.length === 1 ? 'place' : 'places'} you love in Da Nang
+              {placesLabel}{cityLabel ? ` ${cityLabel}` : ""}
             </p>
           </div>
 
@@ -150,7 +160,7 @@ export function FavoritesClient() {
         </div>
 
         {restaurants.length > 0 ? (
-          <CollectionSection restaurants={restaurants} />
+          <CollectionSection restaurants={restaurants} groupByCity />
         ) : (
           <div className="text-center py-20 bg-gray-50 rounded-3xl border border-gray-100">
             <Heart className="w-12 h-12 text-gray-300 mx-auto mb-4" />

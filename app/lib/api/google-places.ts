@@ -5,7 +5,7 @@
  */
 
 import crypto from 'crypto'
-import { detectMarketCityFromText } from '../market-cities'
+import { detectMarketCityFromTextOrNull } from '../market-cities'
 import { supabase } from '../supabase'
 
 // Use getter function to read API key at runtime (not at module load time)
@@ -434,7 +434,7 @@ export async function verifyRestaurant(
 ): Promise<PlaceDetails | null> {
   try {
     // Search for the restaurant
-    const inferredCityFromAddress = address ? detectMarketCityFromText(address) : null
+    const inferredCityFromAddress = address ? detectMarketCityFromTextOrNull(address) : null
     const searchLocation = options.locationBias ||
       (inferredCityFromAddress ? { lat: inferredCityFromAddress.latitude, lng: inferredCityFromAddress.longitude } : undefined)
     const query = address

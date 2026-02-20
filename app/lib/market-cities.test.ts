@@ -2,9 +2,27 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MARKET_CITY,
   detectMarketCityFromText,
+  detectMarketCityFromTextOrNull,
   getMarketCityById,
   replaceCollectionCityTags,
 } from './market-cities'
+
+describe('detectMarketCityFromTextOrNull', () => {
+  it('detects city when punctuation separates words', () => {
+    const city = detectMarketCityFromTextOrNull('Street food in Da-Nang this week')
+    expect(city?.id).toBe('da-nang')
+  })
+
+  it('does not match partial tokens', () => {
+    const city = detectMarketCityFromTextOrNull('best shcmarket snacks')
+    expect(city).toBeNull()
+  })
+
+  it('returns null when city is unsupported', () => {
+    const city = detectMarketCityFromTextOrNull('Ha Long seafood tour')
+    expect(city).toBeNull()
+  })
+})
 
 describe('detectMarketCityFromText', () => {
   it('detects Nha Trang from text', () => {

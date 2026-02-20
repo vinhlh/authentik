@@ -1,25 +1,43 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Restaurant, RestaurantCard } from "@/components/stitch/restaurant-card";
 import { CollectionMap } from "@/components/stitch/collection-map";
-import { Map } from "lucide-react";
+import { Map as MapIcon } from "lucide-react";
+import { FALLBACK_CITY_LABEL } from "@/lib/restaurant-city";
 
 interface CollectionSectionProps {
   restaurants: Restaurant[];
   className?: string;
   emptyMessage?: string;
+  groupByCity?: boolean;
 }
 
 export function CollectionSection({
   restaurants,
   className = "",
-  emptyMessage = "No restaurants found."
+  emptyMessage = "No restaurants found.",
+  groupByCity = false
 }: CollectionSectionProps) {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [hoveredRestaurantId, setHoveredRestaurantId] = useState<string | null>(null);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [showMobileMap, setShowMobileMap] = useState(true);
+  const groupedRestaurants = useMemo(() => {
+    if (!groupByCity) return [];
+
+    const grouped = new Map<string, Restaurant[]>();
+
+    for (const restaurant of restaurants) {
+      const cityLabel = restaurant.city?.trim() || FALLBACK_CITY_LABEL;
+      if (!grouped.has(cityLabel)) {
+        grouped.set(cityLabel, []);
+      }
+      grouped.get(cityLabel)!.push(restaurant);
+    }
+
+    return Array.from(grouped.entries());
+  }, [groupByCity, restaurants]);
 
   // Request location permission on page load
   useEffect(() => {
@@ -62,13 +80,17 @@ export function CollectionSection({
   return (
     <div className={`w-full ${className}`}>
       <div className="mb-6 flex items-center justify-between">
-        <span className="font-bold text-xl">{restaurants.length} Spots</span>
+        <span className="font-bold text-xl">
+          {groupByCity
+            ? `${restaurants.length} Spots${groupedRestaurants.length > 1 ? ` in ${groupedRestaurants.length} cities` : ""}`
+            : `${restaurants.length} Spots`}
+        </span>
         {/* Mobile map toggle */}
         <button
           onClick={() => setShowMobileMap(!showMobileMap)}
           className="lg:hidden flex items-center gap-2 px-3 py-2 bg-primary text-white rounded-full text-sm font-medium shadow-md"
         >
-          <Map className="w-4 h-4" />
+          <MapIcon className="w-4 h-4" />
           {showMobileMap ? 'Hide Map' : 'Show Map'}
         </button>
       </div>
@@ -92,20 +114,49 @@ export function CollectionSection({
         <div className="flex gap-6 lg:gap-8">
           {/* Restaurant list */}
           <div className="flex-1 min-w-0">
-            <div className="masonry">
-              {restaurants.map((restaurant, index) => (
-                <div key={restaurant.id} id={`restaurant-${restaurant.id}`} className="masonry-item">
-                  <RestaurantCard
-                    restaurant={restaurant}
-                    index={index + 1}
-                    userLocation={userLocation || undefined}
-                    isHovered={hoveredRestaurantId === restaurant.id || selectedRestaurantId === restaurant.id}
-                    onMouseEnter={() => setHoveredRestaurantId(restaurant.id)}
-                    onMouseLeave={() => setHoveredRestaurantId(null)}
-                  />
-                </div>
-              ))}
-            </div>
+            {groupByCity ? (
+              <div className="space-y-10">
+                {groupedRestaurants.map(([cityLabel, cityRestaurants]) => (
+                  <section key={cityLabel}>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg md:text-xl font-bold text-[#1c1917]">{cityLabel}</h3>
+                      <span className="text-sm text-gray-500">
+                        {cityRestaurants.length} {cityRestaurants.length === 1 ? "spot" : "spots"}
+                      </span>
+                    </div>
+                    <div className="masonry">
+                      {cityRestaurants.map((restaurant, index) => (
+                        <div key={restaurant.id} id={`restaurant-${restaurant.id}`} className="masonry-item">
+                          <RestaurantCard
+                            restaurant={restaurant}
+                            index={index + 1}
+                            userLocation={userLocation || undefined}
+                            isHovered={hoveredRestaurantId === restaurant.id || selectedRestaurantId === restaurant.id}
+                            onMouseEnter={() => setHoveredRestaurantId(restaurant.id)}
+                            onMouseLeave={() => setHoveredRestaurantId(null)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="masonry">
+                {restaurants.map((restaurant, index) => (
+                  <div key={restaurant.id} id={`restaurant-${restaurant.id}`} className="masonry-item">
+                    <RestaurantCard
+                      restaurant={restaurant}
+                      index={index + 1}
+                      userLocation={userLocation || undefined}
+                      isHovered={hoveredRestaurantId === restaurant.id || selectedRestaurantId === restaurant.id}
+                      onMouseEnter={() => setHoveredRestaurantId(restaurant.id)}
+                      onMouseLeave={() => setHoveredRestaurantId(null)}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sticky map */}
@@ -125,7 +176,7 @@ export function CollectionSection({
         </div>
       ) : (
         <div className="text-center py-12 text-gray-500 rounded-3xl bg-gray-50 border border-gray-100">
-          <Map className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <MapIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <p>{emptyMessage}</p>
         </div>
       )}

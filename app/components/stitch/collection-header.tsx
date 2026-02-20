@@ -27,7 +27,7 @@ interface CollectionHeaderProps {
 }
 
 export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: CollectionHeaderProps) {
-  const { getI18nText, t } = useLanguage();
+  const { getI18nText, t, language } = useLanguage();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
@@ -40,6 +40,10 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
     if (!channelSlug) return null;
     return withCityParam(`/channels/${encodeURIComponent(channelSlug)}`, cityId);
   })();
+  const name = getI18nText(collection, 'name') || (language === 'vi'
+    ? 'Bộ sưu tập chưa có tên'
+    : 'Untitled Collection');
+  const description = getI18nText(collection, 'description');
 
   const hasImage = !!coverImage;
 
@@ -62,7 +66,7 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
             src={coverImage}
             srcSet={coverImageSrcSet}
             sizes="100vw"
-            alt={getI18nText(collection, 'name')}
+            alt={name}
             className="w-full h-full object-cover opacity-60"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
@@ -82,11 +86,11 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
               {t('collection.curatedBy').replace('{name}', collection.creator_name || "Authentik")}
             </span>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-md">
-              {getI18nText(collection, 'name')}
+              {name}
             </h1>
-            {getI18nText(collection, 'description') && (
+            {description && (
               <p className="text-lg text-gray-200 font-medium max-w-2xl drop-shadow-sm leading-relaxed">
-                {getI18nText(collection, 'description')}
+                {description}
               </p>
             )}
           </div>

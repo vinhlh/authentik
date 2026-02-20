@@ -10,7 +10,7 @@ import { exec } from 'child_process'
 import util from 'util'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { RestaurantMention } from './youtube'
-import { detectMarketCityFromText, type MarketCity } from '../market-cities'
+import { detectMarketCityFromTextOrNull, type MarketCity } from '../market-cities'
 
 const execAsync = util.promisify(exec)
 
@@ -60,8 +60,12 @@ export async function parseTikTokVideo(url: string): Promise<{
     const metadata = await extractMetadata(url)
     console.log(`   📝 Title: ${metadata.description.slice(0, 50)}...`)
     console.log(`   👤 Author: ${metadata.authorName}`)
-    const inferredCity = detectMarketCityFromText(metadata.description, metadata.authorName, url)
-    console.log(`   📍 Inferred city context: ${inferredCity.name}, ${inferredCity.country}`)
+    const inferredCity = detectMarketCityFromTextOrNull(metadata.description, metadata.authorName, url)
+    if (inferredCity) {
+      console.log(`   📍 Inferred city context: ${inferredCity.name}, ${inferredCity.country}`)
+    } else {
+      console.log('   📍 Inferred city context: unknown')
+    }
 
     // 2. Download Video (yt-dlp)
     console.log('   ⬇️  Downloading video for AI analysis...')
@@ -114,11 +118,16 @@ async function downloadVideo(url: string, outputPath: string) {
 async function extractWithGemini(
   filePath: string,
   metadata: TikTokVideoMetadata,
-  cityContext: MarketCity
+  cityContext: MarketCity | null
 ): Promise<RestaurantMention[]> {
   // Read file as base64
   const fileData = fs.readFileSync(filePath)
   const base64Data = fileData.toString('base64')
+
+  const cityLabel = cityContext ? `${cityContext.name}, ${cityContext.country}` : 'Unknown'
+  const localityRule = cityContext
+    ? 'AUTHENTIC LOCAL ONLY: Identify authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.'
+    : 'AUTHENTIC LOCAL ONLY: Keep cuisine aligned with places explicitly mentioned in the video metadata/content. Do not force a specific city if unclear.'
 
   const prompt = `
   You are an expert food critic assistant.
@@ -128,13 +137,13 @@ async function extractWithGemini(
   - Description: ${metadata.description}
   - Author: ${metadata.authorName}
   - Market focus: Vietnam and Singapore
-  - Location context: ${cityContext.name}, ${cityContext.country}
+  - Location context: ${cityLabel}
 
   Task:
   1. Identify any restaurants or food stalls mentioned or shown.
   2. Extract the name, approximate address, recommended dishes, and price estimation.
   3. Ignore non-food places.
-  4. AUTHENTIC LOCAL ONLY: Identify authentic local cuisine for the target city. For Vietnam cities, prioritize Vietnamese dishes. For Singapore, prioritize local hawker/Singaporean dishes. Exclude unrelated imported cuisines.
+  4. ${localityRule}
 
   Output ONLY valid JSON array with this structure:
   [

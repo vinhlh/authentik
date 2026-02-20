@@ -127,6 +127,39 @@ function normalizeText(input: string): string {
     .toLowerCase()
 }
 
+function normalizeTextForCityMatch(input: string): string {
+  return normalizeText(input)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+type CityAliasMatcher = {
+  city: MarketCity
+  normalizedAlias: string
+  matcher: RegExp
+}
+
+const CITY_ALIAS_MATCHERS: CityAliasMatcher[] = MARKET_CITIES
+  .flatMap(city =>
+    city.aliases
+      .map(alias => {
+        const normalizedAlias = normalizeTextForCityMatch(alias)
+        if (!normalizedAlias) return null
+        return {
+          city,
+          normalizedAlias,
+          matcher: new RegExp(`(?:^|\\s)${escapeRegExp(normalizedAlias)}(?:\\s|$)`),
+        } as CityAliasMatcher
+      })
+      .filter((entry): entry is CityAliasMatcher => entry !== null)
+  )
+  .sort((a, b) => b.normalizedAlias.length - a.normalizedAlias.length)
+
 export function getMarketCityById(id?: string | null): MarketCity {
   if (!id) return DEFAULT_MARKET_CITY
   return CITY_BY_ID.get(id as MarketCityId) || DEFAULT_MARKET_CITY
@@ -163,23 +196,29 @@ export function replaceCollectionCityTags(
 }
 
 export function detectMarketCityFromText(...texts: Array<string | null | undefined>): MarketCity {
-  const combined = normalizeText(
+  const detected = detectMarketCityFromTextOrNull(...texts)
+  if (detected) return detected
+  return DEFAULT_MARKET_CITY
+}
+
+export function detectMarketCityFromTextOrNull(
+  ...texts: Array<string | null | undefined>
+): MarketCity | null {
+  const combined = normalizeTextForCityMatch(
     texts
       .filter(Boolean)
       .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim()
   )
 
-  if (!combined) return DEFAULT_MARKET_CITY
+  if (!combined) return null
 
-  for (const city of MARKET_CITIES) {
-    if (city.aliases.some(alias => combined.includes(normalizeText(alias)))) {
-      return city
+  for (const entry of CITY_ALIAS_MATCHERS) {
+    if (entry.matcher.test(combined)) {
+      return entry.city
     }
   }
 
-  return DEFAULT_MARKET_CITY
+  return null
 }
 
 export function getCityLocationBias(city: MarketCity): { lat: number; lng: number } {

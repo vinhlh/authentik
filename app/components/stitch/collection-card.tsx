@@ -21,12 +21,14 @@ interface CollectionCardProps {
 }
 
 export function CollectionCard({ collection }: CollectionCardProps) {
-  const { getI18nText } = useLanguage();
+  const { getI18nText, language } = useLanguage();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
 
-  const name = getI18nText(collection, 'name');
+  const name = getI18nText(collection, 'name') || (language === 'vi'
+    ? 'Bộ sưu tập chưa có tên'
+    : 'Untitled Collection');
 
   // Extract YouTube video ID and build responsive thumbnail URLs
   const videoId = collection.source_url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];

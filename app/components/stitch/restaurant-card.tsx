@@ -18,6 +18,7 @@ export interface Restaurant {
   name: string;
   rating: number;
   location: string;
+  city?: string;
   cuisine: string;
   price: string;
   tags: string[];
