@@ -8,6 +8,7 @@ import {
   getCollectionCityTags,
   getMarketCityById,
 } from "@/lib/market-cities";
+import { getChannelSlug } from "@/lib/channel-slug";
 import { supabase } from "@/lib/supabase";
 
 export const revalidate = 60;
@@ -16,8 +17,6 @@ type PageParams = Promise<{ id: string }>;
 
 type PageSearchParams = {
   city?: string | string[];
-  name?: string | string[];
-  url?: string | string[];
 };
 
 type ChannelCollection = {
@@ -70,97 +69,105 @@ function createCollectionsQuery(cityTags: string[]) {
 }
 
 async function getChannelCollections(
-  channelKey: string,
-  cityTags: string[],
-  requestedUrl?: string,
-  requestedName?: string
+  channelLookupKey: string,
+  cityTags: string[]
 ): Promise<{
   collections: ChannelCollection[];
   resolvedName: string;
   resolvedUrl: string | null;
 }> {
-  const normalizedKey = channelKey.trim();
-  const normalizedName = requestedName?.trim();
-  const normalizedUrl = requestedUrl?.trim();
-
-  const fallbackName = normalizedName || normalizedKey;
+  const normalizedKey = channelLookupKey.trim();
+  const fallbackName = normalizedKey;
 
   if (!normalizedKey) {
     return {
       collections: [],
       resolvedName: fallbackName,
-      resolvedUrl: normalizedUrl || null,
+      resolvedUrl: null,
     };
   }
 
-  const byIdResult = await createCollectionsQuery(cityTags)
-    .eq("source_channel_id", normalizedKey);
-
-  if (!byIdResult.error && byIdResult.data && byIdResult.data.length > 0) {
-    const first = byIdResult.data[0];
+  const mapCollectionsResult = (
+    data: ChannelCollection[],
+    defaultName: string
+  ): {
+    collections: ChannelCollection[];
+    resolvedName: string;
+    resolvedUrl: string | null;
+  } => {
+    const first = data[0];
     return {
-      collections: byIdResult.data.map((item) => ({
+      collections: data.map((item) => ({
         ...(item as ChannelCollection),
         restaurant_count: getRestaurantCount(item as ChannelCollection),
       })),
-      resolvedName: first.source_channel_name || fallbackName,
-      resolvedUrl: first.source_channel_url || normalizedUrl || null,
+      resolvedName: first.source_channel_name || defaultName,
+      resolvedUrl: first.source_channel_url || null,
     };
-  }
+  };
 
-  if (normalizedUrl) {
-    const byUrlResult = await createCollectionsQuery(cityTags)
-      .eq("source_channel_url", normalizedUrl);
+  const tryFetchBy = async (
+    field: "source_channel_id" | "source_channel_name",
+    value: string,
+    defaultName: string
+  ): Promise<{
+    collections: ChannelCollection[];
+    resolvedName: string;
+    resolvedUrl: string | null;
+  } | null> => {
+    const result = await createCollectionsQuery(cityTags).eq(field, value);
+    if (result.error || !result.data || result.data.length === 0) return null;
+    return mapCollectionsResult(result.data as ChannelCollection[], defaultName);
+  };
 
-    if (!byUrlResult.error && byUrlResult.data && byUrlResult.data.length > 0) {
-      const first = byUrlResult.data[0];
+  const byId = await tryFetchBy("source_channel_id", normalizedKey, fallbackName);
+  if (byId) return byId;
+
+  const byName = await tryFetchBy("source_channel_name", normalizedKey, fallbackName);
+  if (byName) return byName;
+
+  const channelCandidatesResult = await createCollectionsQuery(cityTags).select(
+    "source_channel_id, source_channel_name, source_channel_url"
+  );
+
+  if (!channelCandidatesResult.error && channelCandidatesResult.data) {
+    for (const candidate of channelCandidatesResult.data as ChannelCollection[]) {
+      const candidateSlug = getChannelSlug(
+        candidate.source_channel_name,
+        candidate.source_channel_id
+      );
+      if (candidateSlug !== normalizedKey) continue;
+
+      if (candidate.source_channel_id) {
+        const byResolvedId = await tryFetchBy(
+          "source_channel_id",
+          candidate.source_channel_id,
+          candidate.source_channel_name || fallbackName
+        );
+        if (byResolvedId) return byResolvedId;
+      }
+
+      if (candidate.source_channel_name) {
+        const byResolvedName = await tryFetchBy(
+          "source_channel_name",
+          candidate.source_channel_name,
+          candidate.source_channel_name
+        );
+        if (byResolvedName) return byResolvedName;
+      }
+
       return {
-        collections: byUrlResult.data.map((item) => ({
-          ...(item as ChannelCollection),
-          restaurant_count: getRestaurantCount(item as ChannelCollection),
-        })),
-        resolvedName: first.source_channel_name || fallbackName,
-        resolvedUrl: first.source_channel_url || normalizedUrl || null,
+        collections: [],
+        resolvedName: candidate.source_channel_name || fallbackName,
+        resolvedUrl: candidate.source_channel_url || null,
       };
     }
-  }
-
-  if (normalizedName) {
-    const byNameResult = await createCollectionsQuery(cityTags)
-      .eq("source_channel_name", normalizedName);
-
-    if (!byNameResult.error && byNameResult.data && byNameResult.data.length > 0) {
-      const first = byNameResult.data[0];
-      return {
-        collections: byNameResult.data.map((item) => ({
-          ...(item as ChannelCollection),
-          restaurant_count: getRestaurantCount(item as ChannelCollection),
-        })),
-        resolvedName: first.source_channel_name || fallbackName,
-        resolvedUrl: first.source_channel_url || normalizedUrl || null,
-      };
-    }
-  }
-
-  const byKeyAsNameResult = await createCollectionsQuery(cityTags)
-    .eq("source_channel_name", normalizedKey);
-
-  if (!byKeyAsNameResult.error && byKeyAsNameResult.data && byKeyAsNameResult.data.length > 0) {
-    const first = byKeyAsNameResult.data[0];
-    return {
-      collections: byKeyAsNameResult.data.map((item) => ({
-        ...(item as ChannelCollection),
-        restaurant_count: getRestaurantCount(item as ChannelCollection),
-      })),
-      resolvedName: first.source_channel_name || fallbackName,
-      resolvedUrl: first.source_channel_url || normalizedUrl || null,
-    };
   }
 
   return {
     collections: [],
     resolvedName: fallbackName,
-    resolvedUrl: normalizedUrl || null,
+    resolvedUrl: null,
   };
 }
 
@@ -179,9 +186,11 @@ export async function generateMetadata({
       : (searchParams as PageSearchParams)
     : {};
 
+  const selectedCity = getMarketCityById(getFirstValue(resolvedSearchParams.city));
+  const cityTags = getCollectionCityTags(selectedCity);
   const channelKey = safeDecode(id) || id;
-  const requestedName = safeDecode(getFirstValue(resolvedSearchParams.name));
-  const titleName = requestedName || channelKey;
+  const { resolvedName } = await getChannelCollections(channelKey, cityTags);
+  const titleName = resolvedName || channelKey;
 
   return {
     title: `${titleName} Collections | Authentik`,
@@ -210,15 +219,7 @@ export default async function ChannelPage({
     selectedCity.id === DEFAULT_MARKET_CITY.id ? null : selectedCity.id;
 
   const channelKey = safeDecode(id) || id;
-  const requestedName = safeDecode(getFirstValue(resolvedSearchParams.name));
-  const requestedUrl = safeDecode(getFirstValue(resolvedSearchParams.url));
-
-  const { collections, resolvedName, resolvedUrl } = await getChannelCollections(
-    channelKey,
-    cityTags,
-    requestedUrl,
-    requestedName
-  );
+  const { collections, resolvedName, resolvedUrl } = await getChannelCollections(channelKey, cityTags);
 
   return (
     <main className="max-w-[1200px] mx-auto px-6 py-8 w-full">

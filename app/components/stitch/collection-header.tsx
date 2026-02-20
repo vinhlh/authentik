@@ -6,6 +6,7 @@ import { useLanguage } from "@/lib/i18n-context";
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getCityIdFromPathname, withCityParam } from "@/lib/city-url";
+import { getChannelSlug } from "@/lib/channel-slug";
 
 interface CollectionHeaderProps {
   collection: {
@@ -31,19 +32,13 @@ export function CollectionHeader({ collection, coverImage, coverImageSrcSet }: C
   const searchParams = useSearchParams();
   const cityId = getCityIdFromPathname(pathname) || searchParams.get("city");
   const [showCopiedToast, setShowCopiedToast] = useState(false);
-  const channelKey = collection.source_channel_id || collection.source_channel_name;
+  const channelSlug = getChannelSlug(
+    collection.source_channel_name,
+    collection.source_channel_id
+  );
   const channelPageHref = (() => {
-    if (!channelKey) return null;
-    const params = new URLSearchParams();
-    if (collection.source_channel_name) {
-      params.set("name", collection.source_channel_name);
-    }
-    if (collection.source_channel_url) {
-      params.set("url", collection.source_channel_url);
-    }
-    const basePath = `/channels/${encodeURIComponent(channelKey)}`;
-    const href = params.toString() ? `${basePath}?${params.toString()}` : basePath;
-    return withCityParam(href, cityId);
+    if (!channelSlug) return null;
+    return withCityParam(`/channels/${encodeURIComponent(channelSlug)}`, cityId);
   })();
 
   const hasImage = !!coverImage;

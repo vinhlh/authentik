@@ -333,24 +333,50 @@ export async function extractFromVideo(
             aiSummaryEn = unifiedReview.summary_en;
             console.log(`   ✨ AI Review (VI): "${aiSummaryVi}"`)
           } else if (mention.notes && mention.notes.length > 20) {
-            // Fallback to individual call if missed in unified pass (rare but possible)
-            console.log(`   ⚠️ Missed in unified pass, generating fallback review...`);
-            aiSummaryVi = await generateReviewSummary(mention.notes, creatorName, verified.name);
-            await delay(12000);
+            // Avoid extra per-restaurant LLM calls during large batches.
+            console.log(`   ⚠️ Missed in unified pass, skipping fallback review to avoid rate limits.`);
           }
 
           // Link to collection (upsert/handle duplicates)
           await linkRestaurantToCollection(collection.id, restaurantId, mention, verified, aiSummaryEn, aiSummaryVi)
 
-          // Process Photos (Non-blocking / Graceful fail)
+          // Process photos only when restaurant has no images yet.
+          // This avoids repeated expensive image work across duplicate mentions.
           try {
-            console.log(`   📸 Processing photos for: ${verified.name}...`)
-            const collectionSlug = createSlug(collection.name_vi || collection.name)
+            const { data: existingRestaurant } = await supabase
+              .from('restaurants')
+              .select('images')
+              .eq('id', restaurantId)
+              .single()
 
-            // We use the verified place details which has the photos array
-            await processRestaurantPhotos(verified, collectionSlug, 3, 10, {
-              skipEnhancement: true // Set to true if too slow/expensive
-            })
+            const hasImages =
+              Array.isArray(existingRestaurant?.images) &&
+              existingRestaurant.images.length > 0
+
+            if (hasImages) {
+              console.log(`   ⏩ Skipping photo processing (images already present)`)
+            } else {
+              console.log(`   📸 Processing photos for: ${verified.name}...`)
+              const collectionSlug = createSlug(collection.name_vi || collection.name)
+
+              // We use the verified place details which has the photos array
+              const photoResults = await processRestaurantPhotos(verified, collectionSlug, 3, 10, {
+                skipAnalysis: true,
+                skipEnhancement: true // Set to true if too slow/expensive
+              })
+
+              const imageUrls = photoResults
+                .filter(r => r.success)
+                .slice(0, 3)
+                .map(r => r.webPath)
+
+              if (imageUrls.length > 0) {
+                await supabase
+                  .from('restaurants')
+                  .update({ images: imageUrls })
+                  .eq('id', restaurantId)
+              }
+            }
           } catch (photoError) {
             console.error(`   ⚠️ Photo processing failed for ${verified.name}:`, photoError)
             // Don't fail the whole import just because photos failed
@@ -750,16 +776,17 @@ ${listings}
 
     console.log("🚀 Sending Unified Gemini Request...");
 
-    // Retry logic
+    // Retry logic (short backoff to keep batch throughput predictable).
+    const maxAttempts = Number(process.env.UNIFIED_EXTRACTION_MAX_ATTEMPTS || 2) || 2
     let result
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < maxAttempts; i++) {
       try {
         result = await model.generateContent(prompt)
         break
       } catch (e: any) {
         if (e.message?.includes('429') || e.status === 429) {
-          if (i === 4) throw e
-          const waitTime = (i + 1) * 15000
+          if (i === maxAttempts - 1) throw e
+          const waitTime = (i + 1) * 5000
           console.log(`⏳ AI Rate limit hit. Retrying in ${waitTime / 1000}s...`)
           await new Promise(resolve => setTimeout(resolve, waitTime))
         } else {

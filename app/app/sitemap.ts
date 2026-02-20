@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next'
 import { supabase } from '@/lib/supabase'
 import { getUrlKey } from '@/lib/url-keys'
+import { getChannelSlug } from '@/lib/channel-slug'
 
 export const revalidate = 3600 // Refresh sitemap every hour
 
@@ -80,13 +81,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }))
 
-  // Channel pages are generated from source channel identifiers in visible collections.
+  // Channel pages are generated from source channel metadata in visible collections.
   const channelMap = new Map<string, Date>()
   for (const collection of collections) {
-    const channelKey = collection.source_channel_id?.trim() || collection.source_channel_name?.trim()
-    if (!channelKey) continue
+    const channelSlug = getChannelSlug(
+      collection.source_channel_name,
+      collection.source_channel_id
+    )
+    if (!channelSlug) continue
 
-    const channelUrl = toAbsoluteUrl(baseUrl, `/channels/${encodeURIComponent(channelKey)}`)
+    const channelUrl = toAbsoluteUrl(baseUrl, `/channels/${encodeURIComponent(channelSlug)}`)
     const lastModified = toLastModified(collection.updated_at)
     const previous = channelMap.get(channelUrl)
 
